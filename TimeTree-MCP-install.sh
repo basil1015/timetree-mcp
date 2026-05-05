@@ -38,8 +38,8 @@ if [ ! -f "$DIST_PATH" ]; then
 fi
 
 # Link globally for npx usage
-echo "🔗 Linking globally..."
-npm link
+echo "🔗 Linking globally with npm link..."
+npm link --silent
 
 echo ""
 echo "✅ Installation complete!"
@@ -230,14 +230,11 @@ Most MCP clients support this standard format:
   }
 }
 
-Or as command line:
-
-npx timetree-mcp
-
 With environment variables:
 
 export TIMETREE_EMAIL=your-email@example.com
 export TIMETREE_PASSWORD=your-password
+npx timetree-mcp
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 EOF
     ;;
@@ -254,7 +251,4 @@ echo "   • Replace 'your-password' with your TimeTree password"
 echo "   • Keep your credentials secure!"
 echo ""
 echo "🎉 Installation complete! Follow the configuration steps above."
-echo ""
-echo "To uninstall, simply delete the TimeTree-MCP directory:"
-echo "   rm -rf $INSTALL_DIR"
 echo ""

@@ -8,9 +8,9 @@ assignees: ''
 
 ## ⚠️ Important Notes
 
-- This project focuses on **READ-ONLY** operations (calendars, events)
 - Features should not overload TimeTree's servers
 - TimeTree may change their API, breaking any feature
+- Please explain why the feature is worth the maintenance cost
 
 ## Feature Description
 
@@ -39,7 +39,6 @@ Have you considered any alternative solutions or workarounds?
 ## Impact
 
 - [ ] This feature would benefit most users
-- [ ] This feature is read-only (doesn't modify data)
 - [ ] This feature respects TimeTree's API limits
 - [ ] I'm willing to help implement this feature
 

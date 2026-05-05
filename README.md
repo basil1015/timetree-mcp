@@ -34,18 +34,13 @@ An unofficial MCP (Model Context Protocol) server that allows MCP clients (Claud
 
 #### Quick Install (Recommended)
 
-**One-line installation** - Automatically clones, builds, and configures:
+**One-line installation** - Automatically clones, builds, runs `npm link`, and prints client configuration examples:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ehs208/TimeTree-MCP/main/TimeTree-MCP-install.sh | bash
 ```
 
-The script will show configuration instructions for all supported MCP clients. Just copy the config for your client and add your TimeTree credentials.
-
-**Uninstall:**
-```bash
-curl -fsSL https://raw.githubusercontent.com/ehs208/TimeTree-MCP/main/TimeTree-MCP-uninstall.sh | bash
-```
+The script will link `timetree-mcp` into your local npm environment with `npm link`, then show configuration instructions for all supported MCP clients. Just copy the config for your client and add your TimeTree credentials.
 
 #### Manual Install
 
@@ -61,7 +56,7 @@ npm install
 npm run build
 ```
 
-2. **Link the package:**
+2. **Link the package for local `npx` usage:**
 
 ```bash
 npm link
@@ -94,7 +89,7 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
 }
 ```
 
-Then restart Claude Desktop (Cmd+Q and reopen).
+This works after the one-time `npm link` step above. Then restart Claude Desktop (Cmd+Q and reopen).
 
 📖 **For all MCP clients (Claude Desktop Windows, Claude Code CLI, Codex, Antigravity, VS Code editors, etc.):**
 → See **[docs/MCP_CLIENTS.md](docs/MCP_CLIENTS.md)** for detailed configuration instructions
@@ -104,7 +99,7 @@ Then restart Claude Desktop (Cmd+Q and reopen).
 To update to the latest version:
 
 ```bash
-cd ~/timetree-mcp  # or your installation path
+cd /path/to/TimeTree-MCP  # or your installation path
 git pull origin main
 npm install
 npm run build

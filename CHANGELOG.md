@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Clarified that the documented `npx timetree-mcp` setup depends on a local `npm link` step rather than npm publish
+- Removed outdated contribution and feature-request wording to match current CRUD support
+
 ## [0.1.0] - 2026-02-15
 
 ### Added

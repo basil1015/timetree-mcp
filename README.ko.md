@@ -34,18 +34,13 @@ MCP 클라이언트(Claude Desktop, Claude Code, Codex, Antigravity, Cline, Curs
 
 #### 빠른 설치 (권장)
 
-**한 줄 설치** - 자동으로 복제, 빌드, 설정:
+**한 줄 설치** - 자동으로 복제, 빌드, `npm link` 실행 후 클라이언트 설정 예시를 출력:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ehs208/TimeTree-MCP/main/TimeTree-MCP-install.sh | bash
 ```
 
-스크립트가 지원하는 모든 MCP 클라이언트에 대한 설정 방법을 보여줍니다. 사용하는 클라이언트의 설정을 복사하고 TimeTree 인증 정보만 입력하면 됩니다.
-
-**제거:**
-```bash
-curl -fsSL https://raw.githubusercontent.com/ehs208/TimeTree-MCP/main/TimeTree-MCP-uninstall.sh | bash
-```
+스크립트가 `npm link`로 `timetree-mcp`를 로컬 npm 환경에 연결한 뒤, 지원하는 MCP 클라이언트 설정 예시를 보여줍니다. 사용하는 클라이언트의 설정을 복사하고 TimeTree 인증 정보만 입력하면 됩니다.
 
 #### 수동 설치
 
@@ -61,7 +56,7 @@ npm install
 npm run build
 ```
 
-2. **패키지 링크:**
+2. **로컬 `npx` 사용을 위해 패키지 링크:**
 
 ```bash
 npm link
@@ -94,7 +89,7 @@ npm link
 }
 ```
 
-그 다음 Claude Desktop 재시작 (Cmd+Q로 종료 후 재실행).
+위의 `npm link`를 한 번 실행한 뒤 Claude Desktop을 재시작하세요 (Cmd+Q로 종료 후 재실행).
 
 📖 **모든 MCP 클라이언트 설정 (Claude Desktop Windows, Claude Code CLI, Codex, Antigravity, VS Code 에디터 등):**
 → 자세한 설정 방법은 **[docs/MCP_CLIENTS.md](docs/MCP_CLIENTS.md)** 참조
@@ -104,7 +99,7 @@ npm link
 최신 버전으로 업데이트하려면:
 
 ```bash
-cd ~/timetree-mcp  # 또는 설치 경로
+cd /path/to/TimeTree-MCP  # 또는 설치 경로
 git pull origin main
 npm install
 npm run build

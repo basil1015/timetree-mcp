@@ -1,7 +1,7 @@
 {
   "name": "timetree-mcp",
   "version": "0.1.0",
-  "description": "Unofficial TimeTree MCP Server for personal use - Read your TimeTree calendar data with Claude AI",
+  "description": "Unofficial TimeTree MCP Server for personal use - access and manage TimeTree calendar data with MCP-compatible AI clients",
   "private": true,
   "type": "module",
   "main": "dist/index.js",

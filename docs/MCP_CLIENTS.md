@@ -16,6 +16,8 @@ All clients use the same basic configuration format:
 }
 ```
 
+> This assumes you already ran `npm link` once in your cloned `TimeTree-MCP` directory.
+
 ## Supported Clients
 
 <details>
@@ -164,6 +166,7 @@ Most MCP clients support this standard format:
 - Store credentials only in MCP client config files
 - These config files should be in your gitignore
 - Consider using environment variables for added security
+- If `npx timetree-mcp` is not found, run `npm link` again from your cloned `TimeTree-MCP` directory
 
 ## Need Help?
 

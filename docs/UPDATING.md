@@ -5,7 +5,7 @@ Keep your TimeTree MCP server up-to-date with the latest features and fixes.
 ## Quick Update
 
 ```bash
-cd ~/timetree-mcp  # or your installation path
+cd /path/to/TimeTree-MCP  # or your installation path
 git pull origin main
 npm install
 npm run build
@@ -18,7 +18,7 @@ Then restart your MCP client.
 ### Step 1: Navigate to installation directory
 
 ```bash
-cd ~/timetree-mcp  # or your installation path
+cd /path/to/TimeTree-MCP  # or your installation path
 ```
 
 ### Step 2: Pull latest changes
@@ -82,7 +82,11 @@ npm run build
    - Click the three dots (⋮) in Claude Desktop
    - Select "Developer" or check the console output
 
-3. Make sure `npm link` was run during initial installation:
+3. Make sure the linked command still exists:
+   ```bash
+   which timetree-mcp
+   ```
+   If it is missing, run:
    ```bash
    npm link
    ```

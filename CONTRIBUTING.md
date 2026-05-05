@@ -6,7 +6,7 @@ Thank you for your interest in contributing!
 
 This is an **UNOFFICIAL** project using reverse-engineered APIs:
 - TimeTree may change their API at any time
-- Focus on **read-only** functionality only
+- Keep API usage conservative and respectful
 - Be respectful and constructive
 
 ## How Can I Contribute?
@@ -31,8 +31,8 @@ When reporting a bug, include:
 ### Suggesting Features
 
 Feature suggestions are welcome, but keep in mind:
-- Focus on **read-only** operations (calendars, events)
 - Avoid features that could overload TimeTree's servers
+- Prefer features that keep the MCP surface understandable and maintainable
 - Consider if the feature benefits most users
 
 ### Pull Requests
@@ -76,6 +76,12 @@ git clone https://github.com/ehs208/TimeTree-MCP.git
 cd TimeTree-MCP
 npm install
 npm run build
+```
+
+If you want to test through MCP clients using `npx timetree-mcp`, run:
+
+```bash
+npm link
 ```
 
 ### Project Structure
