@@ -89,23 +89,25 @@ npm link
 ```
 TimeTree-MCP/
 ├── src/
-│   ├── index.ts              # MCP server entry point
+│   ├── index.ts                  # MCP server entry point
 │   ├── config/
-│   │   └── config.ts         # API endpoints and constants
+│   │   └── config.ts             # API endpoints and constants
 │   ├── utils/
-│   │   ├── logger.ts         # Structured logging
-│   │   ├── http-client.ts    # HTTP wrapper
-│   │   └── rate-limiter.ts   # Token bucket rate limiter
+│   │   ├── logger.ts             # Structured logging (stderr only)
+│   │   ├── http-client.ts        # HTTP wrapper (native fetch)
+│   │   └── rate-limiter.ts       # Token bucket rate limiter
 │   ├── client/
-│   │   ├── auth.ts           # Authentication manager
-│   │   └── api.ts            # TimeTree API client
+│   │   ├── auth.ts               # Authentication + CSRF token manager
+│   │   └── api.ts                # TimeTree API client (read + CRUD)
 │   ├── tools/
-│   │   ├── index.ts          # Tool registration
-│   │   ├── calendar-tools.ts # Calendar operations
-│   │   └── event-tools.ts    # Event operations
+│   │   ├── index.ts              # Tool registration
+│   │   ├── calendar-tools.ts     # list_calendars
+│   │   ├── event-tools.ts        # get_events, get_updated_events
+│   │   └── event-crud-tools.ts   # create_event, update_event, delete_event
 │   └── types/
-│       └── timetree.ts       # TypeScript/Zod types
-└── dist/                     # Build output
+│       ├── timetree.ts           # TypeScript/Zod schemas
+│       └── label-colors.ts       # Event color mapping (label_id 1-10)
+└── dist/                         # Build output
 ```
 
 ### Testing
