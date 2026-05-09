@@ -4,6 +4,37 @@ set -e
 echo "🚀 Installing TimeTree MCP Server..."
 echo ""
 
+# Pre-flight checks
+if ! command -v git &> /dev/null; then
+  echo "❌ ERROR: git is not installed."
+  echo "   Please install git first: https://git-scm.com/downloads"
+  exit 1
+fi
+
+if ! command -v node &> /dev/null; then
+  echo "❌ ERROR: Node.js is not installed."
+  echo "   Please install Node.js 18 or later: https://nodejs.org"
+  exit 1
+fi
+
+NODE_MAJOR=$(node -v | sed 's/v//' | cut -d. -f1)
+if [ "$NODE_MAJOR" -lt 18 ]; then
+  echo "❌ ERROR: Node.js 18+ is required (found $(node -v))"
+  echo "   Please upgrade: https://nodejs.org"
+  exit 1
+fi
+
+if ! command -v npm &> /dev/null; then
+  echo "❌ ERROR: npm is not installed."
+  echo "   Please install Node.js which includes npm: https://nodejs.org"
+  exit 1
+fi
+
+echo "✓ git $(git --version | cut -d' ' -f3)"
+echo "✓ node $(node -v)"
+echo "✓ npm $(npm -v)"
+echo ""
+
 # Check if TimeTree-MCP directory exists in current location
 if [ -d "TimeTree-MCP" ]; then
   echo "📁 Existing installation found"
@@ -39,7 +70,18 @@ fi
 
 # Link globally for npx usage
 echo "🔗 Linking globally with npm link..."
-npm link --silent
+if ! npm link 2>&1; then
+  echo ""
+  echo "⚠️  npm link failed. This is usually a permissions issue."
+  echo "   Try one of:"
+  echo "   • Run with sudo: sudo npm link"
+  echo "   • Fix npm permissions: https://docs.npmjs.com/resolving-eacces-permissions-errors"
+  echo ""
+  echo "   Without npm link, use the full path in your MCP config instead:"
+  echo "   \"command\": \"node\","
+  echo "   \"args\": [\"$DIST_PATH\"]"
+  echo ""
+fi
 
 echo ""
 echo "✅ Installation complete!"
