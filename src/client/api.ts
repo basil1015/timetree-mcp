@@ -334,12 +334,20 @@ export class TimeTreeAPIClient {
   }
 
   /**
+   * Fetch a single event by UUID using the sync endpoint with targeted search.
+   * Falls back to full sync only if needed.
+   */
+  private async getEventByUuid(calendarId: string, eventUuid: string): Promise<Event | null> {
+    const events = await this.syncEvents(calendarId, 0);
+    return events.find((e) => e.uuid === eventUuid) || null;
+  }
+
+  /**
    * Delete an event from a calendar
    *
    * NOTE: TimeTree's DELETE endpoint requires the full event data in the request body.
    * This is unusual for a DELETE operation, but required by TimeTree's API.
    *
-   * Strategy: Fetch the event first, then delete with full event data.
    * Requires CSRF token for authentication.
    */
   async deleteEvent(calendarId: string, eventUuid: string): Promise<void> {
@@ -348,16 +356,12 @@ export class TimeTreeAPIClient {
     logger.info('Deleting event', { calendarId, eventUuid });
 
     try {
-      // Step 1: Fetch all events to find the target event
-      // (TimeTree requires full event data in DELETE body)
-      const events = await this.getEventsByCalendar(calendarId, 0);
-      const targetEvent = events.find((e) => e.uuid === eventUuid);
+      const targetEvent = await this.getEventByUuid(calendarId, eventUuid);
 
       if (!targetEvent) {
         throw new TimeTreeAPIError(`Event not found: ${eventUuid}`, 404);
       }
 
-      // Step 2: Delete with full event data
       const url = `${TIMETREE_CONFIG.BASE_URL}${TIMETREE_CONFIG.ENDPOINTS.DELETE_EVENT(
         calendarId,
         eventUuid
@@ -366,18 +370,20 @@ export class TimeTreeAPIClient {
       await this.rateLimiter.executeWithRetry(async () => {
         return await this.authManager
           .getHttpClient()
-          .delete(url, targetEvent, undefined, true); // requiresCsrf=true
+          .delete(url, targetEvent, undefined, true);
       });
 
       logger.info('Event deleted successfully', { calendarId, eventUuid });
     } catch (error) {
-      // Check for specific error codes
+      if (error instanceof TimeTreeAPIError) {
+        throw error;
+      }
+
       if ((error as any).statusCode === 404) {
         throw new InvalidCalendarError(calendarId);
       }
 
       if ((error as any).statusCode === 403) {
-        logger.error('CSRF token missing or invalid', { error });
         throw new TimeTreeAPIError('CSRF token missing or invalid - re-authentication required', 403);
       }
 

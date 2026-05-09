@@ -1,9 +1,8 @@
 /**
  * HTTP Client Wrapper
- * Provides a wrapper around node-fetch with common headers, timeout, and error handling.
+ * Provides a wrapper around native fetch with common headers, timeout, and error handling.
  */
 
-import fetch from 'node-fetch';
 import { TIMETREE_CONFIG } from '../config/config.js';
 import { logger } from './logger.js';
 

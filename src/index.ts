@@ -19,7 +19,7 @@ import { registerTools } from './tools/index.js';
 import { logger } from './utils/logger.js';
 
 // Version
-const VERSION = '0.1.0';
+const VERSION = '0.2.0';
 
 /**
  * Validate required environment variables
