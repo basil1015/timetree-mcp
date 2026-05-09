@@ -8,41 +8,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.0] - 2026-05-10
 
 ### Added
-- `create_event` tool - Create new events in calendars
-- `update_event` tool - Update existing events (partial updates supported)
-- `delete_event` tool - Delete events from calendars
-- `get_updated_events` tool - Efficient incremental sync for recently modified events
-- Label color support (label_id 1-10) with human-readable color names in output
-- CSRF token management for write operations
 - CI workflow for automated build verification on PRs
-- Auto-reviewer assignment on pull requests
+- CODEOWNERS for auto-reviewer assignment
+- Pre-flight checks in install script (git, Node.js 18+, npm)
 
 ### Changed
 - Replaced `node-fetch` with native `fetch` (Node.js 18+)
-- Improved `deleteEvent` to avoid fetching all events unnecessarily
-- Updated COMMANDS.md with full tool documentation
-- Updated CONTRIBUTING.md project structure to reflect current codebase
-- Clarified that the documented `npx timetree-mcp` setup depends on a local `npm link` step rather than npm publish
+- Improved `deleteEvent` error handling
+- Updated all documentation (COMMANDS.md, CONTRIBUTING.md) for current state
 
 ### Removed
-- `node-fetch` dependency (native fetch used instead)
+- `node-fetch` dependency
 
 ## [0.1.0] - 2026-02-15
 
 ### Added
-- Initial release of TimeTree MCP Server
 - `list_calendars` tool - List all active TimeTree calendars
-- `get_events` tool - Get events from a specific calendar with automatic pagination
-- TimeTree authentication via email/password
-- Rate limiting (10 requests/second with token bucket algorithm)
-- Exponential backoff for 429 (rate limit) errors
-- Automatic pagination for event sync API
+- `get_events` tool - Get events with automatic pagination and date filtering
+- `get_updated_events` tool - Efficient incremental sync
+- `create_event` / `update_event` / `delete_event` tools - Full CRUD
+- Label color support (label_id 1-10)
+- TimeTree authentication via email/password with CSRF token management
+- Rate limiting (10 req/sec) with exponential backoff
 - Structured logging with sensitive data masking
-- Comprehensive error handling
-- TypeScript support with full type definitions
-- Zod schema validation for API responses
+- Interactive install script with multi-client configuration guide
 
 ### Security
-- Session cookie management (memory only, never persisted)
+- Session cookies in memory only, never persisted
 - Password and session ID masking in logs
-- Environment variable validation
