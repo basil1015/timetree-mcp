@@ -15,6 +15,11 @@ updates:
       prefix: "chore(deps):"
     reviewers:
       - "ehs208"
+    ignore:
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "zod"
+        update-types: ["version-update:semver-major"]
     # Group all patch updates together
     groups:
       patch-updates:
