@@ -79,11 +79,13 @@ Creates a new event in a calendar.
 | `note` | No | Event description |
 | `location` | No | Event location |
 | `url` | No | Related URL |
+| `checklist` | No | Array of `{title, checked}` items |
 
 **Example prompts:**
 - "Create a meeting tomorrow at 2pm called 'Team Sync'"
 - "Add an all-day event on March 15 called 'Holiday'"
 - "Schedule a red-colored event for dentist appointment next Monday 10am-11am"
+- "Create a 'Packing' event with a checklist: passport, charger, clothes"
 
 ---
 
@@ -103,10 +105,12 @@ Updates an existing event. Only provide fields you want to change.
 | `note` | No | New description |
 | `location` | No | New location |
 | `url` | No | New URL |
+| `checklist` | No | Replace checklist items (use `[]` to clear) |
 
 **Example prompts:**
 - "Move my dentist appointment to 3pm"
 - "Change the Team Sync title to 'Sprint Planning'"
+- "Add a checklist to tomorrow's event: buy cake, book venue"
 - "Add a location to tomorrow's meeting"
 
 ---
