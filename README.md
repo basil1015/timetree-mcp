@@ -32,6 +32,12 @@ An unofficial MCP (Model Context Protocol) server that allows MCP clients (Claud
 
 ### Installation
 
+#### 🚀 Quick Installation for Your Agent
+
+Copy this prompt into Codex, Claude Code, or another coding agent:
+
+> Clone `https://github.com/ehs208/TimeTree-MCP`, enter the cloned directory, run `npm ci && npm run build && npm link`, then configure my MCP client with a server named `timetree` that runs `npx timetree-mcp`. Store `TIMETREE_EMAIL` and `TIMETREE_PASSWORD` only in the MCP client environment configuration, and never hardcode or print secrets.
+
 #### Quick Install (Recommended)
 
 **One-line installation** - Automatically clones, builds, runs `npm link`, and prints client configuration examples:

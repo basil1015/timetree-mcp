@@ -32,6 +32,12 @@ MCP 클라이언트(Claude Desktop, Claude Code, Codex, Antigravity, Cline, Curs
 
 ### 설치
 
+#### 🚀 에이전트를 위한 빠른 설치
+
+Codex, Claude Code 같은 코딩 에이전트에게 아래 프롬프트를 입력하세요:
+
+> `https://github.com/ehs208/TimeTree-MCP`를 클론하고, 클론한 디렉토리 안에서 `npm ci && npm run build && npm link`를 실행한 뒤, 내 MCP 클라이언트에 `timetree` 서버를 추가해줘. 실행 명령은 `npx timetree-mcp`로 설정하고, `TIMETREE_EMAIL`과 `TIMETREE_PASSWORD`는 MCP 클라이언트의 환경변수 설정에만 저장하며 절대 코드나 로그에 직접 쓰지 마.
+
 #### 빠른 설치 (권장)
 
 **한 줄 설치** - 자동으로 복제, 빌드, `npm link` 실행 후 클라이언트 설정 예시를 출력:
