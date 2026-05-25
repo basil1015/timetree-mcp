@@ -13,7 +13,7 @@
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
     "test:build": "node -e \"require('node:fs').rmSync('.test-dist',{recursive:true,force:true})\" && tsc --outDir .test-dist --rootDir src --declaration false --declarationMap false --sourceMap false",
-    "test": "npm run build && npm run test:build && node --test \"tests/**/*.test.mjs\"",
+    "test": "npm run build && npm run test:build && node --test tests/*.test.mjs",
     "verify": "npm run typecheck && npm test && npm audit --audit-level=high"
   },
   "keywords": [
