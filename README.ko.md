@@ -17,6 +17,9 @@ MCP 클라이언트(Claude Desktop, Claude Code, Codex, Antigravity, Cline, Curs
 - ➕ **이벤트 생성** - 캘린더에 새 이벤트 추가
 - ✏️ **이벤트 수정** - 기존 이벤트 수정
 - 🗑️ **이벤트 삭제** - 캘린더에서 이벤트 제거
+- 🗒️ **메모 관리** - TimeTree 메모 조회, 생성, 수정, 삭제
+- 💬 **댓글 관리** - 이벤트 댓글 추가, 조회, 수정, 삭제
+- 🏷️ **캘린더 메타데이터** - 라벨 조회/수정 및 멤버/가상 멤버 조회
 - 🔐 **안전한 인증** - 이메일/비밀번호 인증 (MCP 설정에만 저장)
 - ⚡ **속도 제한** - Token Bucket 알고리즘으로 API 과부하 방지
 - 🔄 **자동 페이지네이션** - 여러 페이지에 걸친 모든 이벤트 자동 조회
@@ -36,17 +39,17 @@ MCP 클라이언트(Claude Desktop, Claude Code, Codex, Antigravity, Cline, Curs
 
 Codex, Claude Code 같은 코딩 에이전트에게 아래 프롬프트를 입력하세요:
 
-> `https://github.com/ehs208/TimeTree-MCP`를 클론하고, 클론한 디렉토리 안에서 `npm ci && npm run build && npm link`를 실행한 뒤, 내 MCP 클라이언트에 `timetree` 서버를 추가해줘. 실행 명령은 `npx timetree-mcp`로 설정하고, `TIMETREE_EMAIL`과 `TIMETREE_PASSWORD`는 MCP 클라이언트의 환경변수 설정에만 저장하며 절대 코드나 로그에 직접 쓰지 마.
+> `https://github.com/ehs208/TimeTree-MCP`를 클론하고, 클론한 디렉토리 안에서 `npm ci && npm run build`를 실행한 뒤, 내 MCP 클라이언트에 `timetree` 서버를 추가해줘. 실행 명령은 `node /absolute/path/to/TimeTree-MCP/dist/index.js` 형태로 실제 clone 경로를 사용하고, `TIMETREE_EMAIL`과 `TIMETREE_PASSWORD`는 MCP 클라이언트의 환경변수 설정에만 저장하며 절대 코드나 로그에 직접 쓰지 마.
 
 #### 빠른 설치 (권장)
 
-**한 줄 설치** - 자동으로 복제, 빌드, `npm link` 실행 후 클라이언트 설정 예시를 출력:
+**한 줄 설치** - 자동으로 복제, 빌드, 선택적 `npm link` 시도 후 클라이언트 설정 예시를 출력:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ehs208/TimeTree-MCP/main/TimeTree-MCP-install.sh | bash
 ```
 
-스크립트가 `npm link`로 `timetree-mcp`를 로컬 npm 환경에 연결한 뒤, 지원하는 MCP 클라이언트 설정 예시를 보여줍니다. 사용하는 클라이언트의 설정을 복사하고 TimeTree 인증 정보만 입력하면 됩니다.
+이 프로젝트는 npm registry가 아니라 GitHub clone 기준으로 설치합니다. 스크립트가 로컬 clone을 빌드하고 선택적으로 `npm link`를 실행한 뒤, 절대 `node`/`dist/index.js` 경로를 사용하는 MCP 클라이언트 설정 예시를 보여줍니다. 사용하는 클라이언트의 설정을 복사하고 TimeTree 인증 정보만 입력하면 됩니다.
 
 #### 수동 설치
 
@@ -58,17 +61,11 @@ curl -fsSL https://raw.githubusercontent.com/ehs208/TimeTree-MCP/main/TimeTree-M
 ```bash
 git clone https://github.com/ehs208/TimeTree-MCP.git
 cd TimeTree-MCP
-npm install
+npm ci
 npm run build
 ```
 
-2. **로컬 `npx` 사용을 위해 패키지 링크:**
-
-```bash
-npm link
-```
-
-3. **MCP 클라이언트 설정:**
+2. **MCP 클라이언트 설정:**
 
 아래 [설정](#설정) 섹션을 참조하여 사용하는 MCP 클라이언트에 맞게 설정하세요.
 
@@ -84,8 +81,8 @@ npm link
 {
   "mcpServers": {
     "timetree": {
-      "command": "npx",
-      "args": ["timetree-mcp"],
+      "command": "node",
+      "args": ["/absolute/path/to/TimeTree-MCP/dist/index.js"],
       "env": {
         "TIMETREE_EMAIL": "your-email@example.com",
         "TIMETREE_PASSWORD": "your-password"
@@ -95,7 +92,7 @@ npm link
 }
 ```
 
-위의 `npm link`를 한 번 실행한 뒤 Claude Desktop을 재시작하세요 (Cmd+Q로 종료 후 재실행).
+경로를 실제 clone 경로로 바꾸세요. GUI 클라이언트가 `node`를 찾지 못하면 `command -v node` 결과의 절대경로를 `command`로 사용하세요. 그 다음 Claude Desktop을 재시작하세요 (Cmd+Q로 종료 후 재실행).
 
 📖 **모든 MCP 클라이언트 설정 (Claude Desktop Windows, Claude Code CLI, Codex, Antigravity, VS Code 에디터 등):**
 → 자세한 설정 방법은 **[docs/MCP_CLIENTS.md](docs/MCP_CLIENTS.md)** 참조
@@ -107,7 +104,7 @@ npm link
 ```bash
 cd /path/to/TimeTree-MCP  # 또는 설치 경로
 git pull origin main
-npm install
+npm ci
 npm run build
 ```
 
@@ -125,9 +122,13 @@ npm run build
 - **list_calendars** - 참여 중인 사용자와 함께 모든 캘린더 조회
 - **get_events** - 자동 페이지네이션으로 캘린더 이벤트 조회
 - **get_updated_events** - 특정 시간 이후 업데이트된 이벤트 조회 (효율적인 증분 동기화)
-- **create_event** - 캘린더에 새 이벤트 생성
+- **create_event** - 캘린더에 새 이벤트 생성 (알림, 반복, 참석자, 체크리스트 지원)
 - **update_event** - 기존 이벤트 수정
 - **delete_event** - 캘린더에서 이벤트 삭제
+- **list_memos / create_memo / update_memo / delete_memo** - TimeTree 메모 관리
+- **add_event_comment / list_event_comments / update_event_comment / delete_event_comment** - 이벤트 댓글 관리
+- **get_calendar_labels / update_calendar_labels** - 캘린더 라벨 조회 또는 병합 업데이트
+- **get_calendar_members / get_calendar_virtual_members** - 캘린더 멤버 메타데이터 조회
 
 📖 파라미터와 사용 세부사항은 [COMMANDS.md](COMMANDS.md) 참조
 

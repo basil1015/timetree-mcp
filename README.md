@@ -17,6 +17,9 @@ An unofficial MCP (Model Context Protocol) server that allows MCP clients (Claud
 - ➕ **Create Events** - Add new events to your calendars
 - ✏️ **Update Events** - Modify existing events
 - 🗑️ **Delete Events** - Remove events from your calendars
+- 🗒️ **Manage Memos** - List, create, update, and delete TimeTree memos
+- 💬 **Manage Comments** - Add, list, update, and delete event comments
+- 🏷️ **Calendar Metadata** - Read/update labels and inspect members/virtual members
 - 🔐 **Secure Authentication** - Email/password authentication (stored only in MCP config)
 - ⚡ **Rate Limiting** - Token bucket algorithm to prevent API overload
 - 🔄 **Auto Pagination** - Automatically fetches all events across multiple pages
@@ -36,17 +39,17 @@ An unofficial MCP (Model Context Protocol) server that allows MCP clients (Claud
 
 Copy this prompt into Codex, Claude Code, or another coding agent:
 
-> Clone `https://github.com/ehs208/TimeTree-MCP`, enter the cloned directory, run `npm ci && npm run build && npm link`, then configure my MCP client with a server named `timetree` that runs `npx timetree-mcp`. Store `TIMETREE_EMAIL` and `TIMETREE_PASSWORD` only in the MCP client environment configuration, and never hardcode or print secrets.
+> Clone `https://github.com/ehs208/TimeTree-MCP`, enter the cloned directory, run `npm ci && npm run build`, then configure my MCP client with a server named `timetree` that runs `node /absolute/path/to/TimeTree-MCP/dist/index.js` (use the real cloned path). Store `TIMETREE_EMAIL` and `TIMETREE_PASSWORD` only in the MCP client environment configuration, and never hardcode or print secrets.
 
 #### Quick Install (Recommended)
 
-**One-line installation** - Automatically clones, builds, runs `npm link`, and prints client configuration examples:
+**One-line installation** - Automatically clones, builds, attempts optional `npm link`, and prints client configuration examples:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ehs208/TimeTree-MCP/main/TimeTree-MCP-install.sh | bash
 ```
 
-The script will link `timetree-mcp` into your local npm environment with `npm link`, then show configuration instructions for all supported MCP clients. Just copy the config for your client and add your TimeTree credentials.
+This project is installed from a GitHub clone, not the npm registry. The script builds the local clone, optionally runs `npm link`, then prints configuration instructions with absolute `node`/`dist/index.js` paths for all supported MCP clients. Just copy the config for your client and add your TimeTree credentials.
 
 #### Manual Install
 
@@ -58,17 +61,11 @@ The script will link `timetree-mcp` into your local npm environment with `npm li
 ```bash
 git clone https://github.com/ehs208/TimeTree-MCP.git
 cd TimeTree-MCP
-npm install
+npm ci
 npm run build
 ```
 
-2. **Link the package for local `npx` usage:**
-
-```bash
-npm link
-```
-
-3. **Configure your MCP client:**
+2. **Configure your MCP client:**
 
 See the [Configuration](#configuration) section below to set up your MCP client.
 
@@ -84,8 +81,8 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
 {
   "mcpServers": {
     "timetree": {
-      "command": "npx",
-      "args": ["timetree-mcp"],
+      "command": "node",
+      "args": ["/absolute/path/to/TimeTree-MCP/dist/index.js"],
       "env": {
         "TIMETREE_EMAIL": "your-email@example.com",
         "TIMETREE_PASSWORD": "your-password"
@@ -95,7 +92,7 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
 }
 ```
 
-This works after the one-time `npm link` step above. Then restart Claude Desktop (Cmd+Q and reopen).
+Replace the path with your cloned repository path. If a GUI client cannot find `node`, use the absolute path from `command -v node` as `command`. Then restart Claude Desktop (Cmd+Q and reopen).
 
 📖 **For all MCP clients (Claude Desktop Windows, Claude Code CLI, Codex, Antigravity, VS Code editors, etc.):**
 → See **[docs/MCP_CLIENTS.md](docs/MCP_CLIENTS.md)** for detailed configuration instructions
@@ -107,7 +104,7 @@ To update to the latest version:
 ```bash
 cd /path/to/TimeTree-MCP  # or your installation path
 git pull origin main
-npm install
+npm ci
 npm run build
 ```
 
@@ -125,9 +122,13 @@ Then restart your MCP client.
 - **list_calendars** - List all calendars with participating users
 - **get_events** - Get events from a calendar with auto-pagination
 - **get_updated_events** - Get events updated after a specific timestamp (efficient incremental sync)
-- **create_event** - Create a new event in a calendar
+- **create_event** - Create a new event in a calendar (supports alerts, recurrences, attendees, checklist)
 - **update_event** - Update an existing event
 - **delete_event** - Delete an event from a calendar
+- **list_memos / create_memo / update_memo / delete_memo** - Manage TimeTree memos
+- **add_event_comment / list_event_comments / update_event_comment / delete_event_comment** - Manage event comments
+- **get_calendar_labels / update_calendar_labels** - Read or merge-update calendar labels
+- **get_calendar_members / get_calendar_virtual_members** - Read calendar member metadata
 
 📖 See [COMMANDS.md](COMMANDS.md) for parameters and usage details.
 

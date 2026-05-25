@@ -102,9 +102,13 @@ export function createGetEventsTool(apiClient: TimeTreeAPIClient) {
           type: event.type || null,
           created_at: event.created_at ? new Date(event.created_at).toISOString() : null,
           updated_at: event.updated_at ? new Date(event.updated_at).toISOString() : null,
+          attendees: event.attendees || [],
+          alerts: event.alerts || [],
+          recurrences: event.recurrences || [],
           has_alerts: event.alerts && event.alerts.length > 0,
           has_recurrence: event.recurrences && event.recurrences.length > 0,
           checklist: event.attachment?.checklist || null,
+          virtual_user_attendees: event.attachment?.virtual_user_attendees || [],
         }));
 
         const result = {
@@ -255,9 +259,13 @@ export function createGetUpdatedEventsTool(apiClient: TimeTreeAPIClient) {
           type: event.type || null,
           created_at: event.created_at ? new Date(event.created_at).toISOString() : null,
           updated_at: event.updated_at ? new Date(event.updated_at).toISOString() : null,
+          attendees: event.attendees || [],
+          alerts: event.alerts || [],
+          recurrences: event.recurrences || [],
           has_alerts: event.alerts && event.alerts.length > 0,
           has_recurrence: event.recurrences && event.recurrences.length > 0,
           checklist: event.attachment?.checklist || null,
+          virtual_user_attendees: event.attachment?.virtual_user_attendees || [],
         }));
 
         const result = {

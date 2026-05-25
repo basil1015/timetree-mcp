@@ -7,8 +7,8 @@ This guide provides detailed configuration instructions for all supported MCP cl
 All clients use the same basic configuration format:
 ```json
 {
-  "command": "npx",
-  "args": ["timetree-mcp"],
+  "command": "node",
+  "args": ["/absolute/path/to/TimeTree-MCP/dist/index.js"],
   "env": {
     "TIMETREE_EMAIL": "your-email@example.com",
     "TIMETREE_PASSWORD": "your-password"
@@ -16,7 +16,7 @@ All clients use the same basic configuration format:
 }
 ```
 
-> This assumes you already ran `npm link` once in your cloned `TimeTree-MCP` directory.
+> Replace `/absolute/path/to/TimeTree-MCP` with your cloned repository path. If your GUI client cannot find `node`, use the absolute path from `command -v node` as `command`. `npm link` is optional convenience, not required for this configuration.
 
 ## Supported Clients
 
@@ -29,8 +29,8 @@ All clients use the same basic configuration format:
 {
   "mcpServers": {
     "timetree": {
-      "command": "npx",
-      "args": ["timetree-mcp"],
+      "command": "node",
+      "args": ["/absolute/path/to/TimeTree-MCP/dist/index.js"],
       "env": {
         "TIMETREE_EMAIL": "your-email@example.com",
         "TIMETREE_PASSWORD": "your-password"
@@ -62,7 +62,7 @@ All clients use the same basic configuration format:
 claude mcp add timetree \
   --env TIMETREE_EMAIL=your@email.com \
   --env TIMETREE_PASSWORD=yourpass \
-  -- npx timetree-mcp
+  -- node /absolute/path/to/TimeTree-MCP/dist/index.js
 ```
 
 </details>
@@ -75,8 +75,8 @@ claude mcp add timetree \
 ```toml
 [[mcp.servers]]
 name = "timetree"
-command = "npx"
-args = ["timetree-mcp"]
+command = "node"
+args = ["/absolute/path/to/TimeTree-MCP/dist/index.js"]
 
 [mcp.servers.env]
 TIMETREE_EMAIL = "your-email@example.com"
@@ -100,8 +100,8 @@ TIMETREE_PASSWORD = "your-password"
 {
   "mcpServers": {
     "timetree": {
-      "command": "npx",
-      "args": ["timetree-mcp"],
+      "command": "node",
+      "args": ["/absolute/path/to/TimeTree-MCP/dist/index.js"],
       "env": {
         "TIMETREE_EMAIL": "your-email@example.com",
         "TIMETREE_PASSWORD": "your-password"
@@ -126,8 +126,8 @@ Configuration varies by editor. Most use similar MCP config format.
 {
   "mcpServers": {
     "timetree": {
-      "command": "npx",
-      "args": ["timetree-mcp"],
+      "command": "node",
+      "args": ["/absolute/path/to/TimeTree-MCP/dist/index.js"],
       "env": {
         "TIMETREE_EMAIL": "your-email@example.com",
         "TIMETREE_PASSWORD": "your-password"
@@ -148,8 +148,8 @@ Most MCP clients support this standard format:
 
 ```json
 {
-  "command": "npx",
-  "args": ["timetree-mcp"],
+  "command": "node",
+  "args": ["/absolute/path/to/TimeTree-MCP/dist/index.js"],
   "env": {
     "TIMETREE_EMAIL": "your-email@example.com",
     "TIMETREE_PASSWORD": "your-password"
@@ -166,7 +166,7 @@ Most MCP clients support this standard format:
 - Store credentials only in MCP client config files
 - These config files should be in your gitignore
 - Consider using environment variables for added security
-- If `npx timetree-mcp` is not found, run `npm link` again from your cloned `TimeTree-MCP` directory
+- Prefer `node /absolute/path/to/TimeTree-MCP/dist/index.js` to avoid PATH/npm-link issues. If you choose the optional `timetree-mcp` command and it is not found, run `npm link` again from your cloned `TimeTree-MCP` directory or switch back to the absolute node/dist path.
 
 ## Need Help?
 

@@ -5,12 +5,30 @@
 
 import type { TimeTreeAPIClient } from '../client/api.js';
 import { createListCalendarsTool } from './calendar-tools.js';
-import { createGetEventsTool, createGetUpdatedEventsTool } from './event-tools.js';
+import {
+  createGetCalendarLabelsTool,
+  createGetCalendarMembersTool,
+  createGetCalendarVirtualMembersTool,
+  createUpdateCalendarLabelsTool,
+} from './calendar-metadata-tools.js';
+import {
+  createAddEventCommentTool,
+  createDeleteEventCommentTool,
+  createListEventCommentsTool,
+  createUpdateEventCommentTool,
+} from './comment-tools.js';
 import {
   createCreateEventTool,
   createUpdateEventTool,
   createDeleteEventTool,
 } from './event-crud-tools.js';
+import { createGetEventsTool, createGetUpdatedEventsTool } from './event-tools.js';
+import {
+  createCreateMemoTool,
+  createDeleteMemoTool,
+  createListMemosTool,
+  createUpdateMemoTool,
+} from './memo-tools.js';
 
 export function registerTools(apiClient: TimeTreeAPIClient) {
   return [
@@ -20,5 +38,17 @@ export function registerTools(apiClient: TimeTreeAPIClient) {
     createCreateEventTool(apiClient),
     createUpdateEventTool(apiClient),
     createDeleteEventTool(apiClient),
+    createListMemosTool(apiClient),
+    createCreateMemoTool(apiClient),
+    createUpdateMemoTool(apiClient),
+    createDeleteMemoTool(apiClient),
+    createAddEventCommentTool(apiClient),
+    createListEventCommentsTool(apiClient),
+    createUpdateEventCommentTool(apiClient),
+    createDeleteEventCommentTool(apiClient),
+    createGetCalendarLabelsTool(apiClient),
+    createUpdateCalendarLabelsTool(apiClient),
+    createGetCalendarMembersTool(apiClient),
+    createGetCalendarVirtualMembersTool(apiClient),
   ];
 }

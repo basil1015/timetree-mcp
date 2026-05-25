@@ -16,10 +16,10 @@ import {
 import { TimeTreeAuthManager } from './client/auth.js';
 import { TimeTreeAPIClient } from './client/api.js';
 import { registerTools } from './tools/index.js';
-import { logger } from './utils/logger.js';
+import { logger, summarizeToolArguments } from './utils/logger.js';
 
 // Version
-const VERSION = '0.2.1';
+const VERSION = '0.3.0';
 
 /**
  * Validate required environment variables
@@ -99,7 +99,7 @@ async function main() {
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
 
-    logger.info('Tool called', { name, args });
+    logger.info('Tool called', { name, ...summarizeToolArguments(args) });
 
     const tool = tools.find((t) => t.name === name);
 
@@ -121,7 +121,7 @@ async function main() {
   await server.connect(transport);
 
   logger.info('TimeTree MCP Server is running');
-  logger.info('Available tools: list_calendars, get_events, get_updated_events, create_event, update_event, delete_event');
+  logger.info('Available tools registered', { total: tools.length, tool_names: tools.map((tool) => tool.name) });
 
   // Handle graceful shutdown
   process.on('SIGINT', async () => {

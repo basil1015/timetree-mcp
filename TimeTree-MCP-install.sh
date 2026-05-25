@@ -50,13 +50,14 @@ fi
 # Set installation directory to current location
 INSTALL_DIR="$(pwd)"
 DIST_PATH="$INSTALL_DIR/dist/index.js"
+NODE_BIN="$(command -v node)"
 
 echo "📁 Installation directory: $INSTALL_DIR"
 echo ""
 
 # Install dependencies
 echo "📦 Installing dependencies..."
-npm install --silent
+npm ci --silent
 
 # Build
 echo "🔨 Building..."
@@ -68,8 +69,8 @@ if [ ! -f "$DIST_PATH" ]; then
   exit 1
 fi
 
-# Link globally for npx usage
-echo "🔗 Linking globally with npm link..."
+# Link globally as an optional convenience command.
+echo "🔗 Linking globally with npm link (optional convenience)..."
 if ! npm link 2>&1; then
   echo ""
   echo "⚠️  npm link failed. This is usually a permissions issue."
@@ -77,8 +78,9 @@ if ! npm link 2>&1; then
   echo "   • Run with sudo: sudo npm link"
   echo "   • Fix npm permissions: https://docs.npmjs.com/resolving-eacces-permissions-errors"
   echo ""
-  echo "   Without npm link, use the full path in your MCP config instead:"
-  echo "   \"command\": \"node\","
+  echo "   This installer prints absolute node/dist paths below, so MCP config still works without npm link."
+  echo "   Optional manual fallback if needed:"
+  echo "   \"command\": \"$NODE_BIN\","
   echo "   \"args\": [\"$DIST_PATH\"]"
   echo ""
 fi
@@ -122,8 +124,8 @@ File: ~/Library/Application Support/Claude/claude_desktop_config.json
 {
   "mcpServers": {
     "timetree": {
-      "command": "npx",
-      "args": ["timetree-mcp"],
+      "command": "$NODE_BIN",
+      "args": ["$DIST_PATH"],
       "env": {
         "TIMETREE_EMAIL": "your-email@example.com",
         "TIMETREE_PASSWORD": "your-password"
@@ -147,8 +149,8 @@ File: %APPDATA%\\Claude\\claude_desktop_config.json
 {
   "mcpServers": {
     "timetree": {
-      "command": "npx",
-      "args": ["timetree-mcp"],
+      "command": "$NODE_BIN",
+      "args": ["$DIST_PATH"],
       "env": {
         "TIMETREE_EMAIL": "your-email@example.com",
         "TIMETREE_PASSWORD": "your-password"
@@ -172,7 +174,7 @@ Run this command:
 claude mcp add timetree \\
   --env TIMETREE_EMAIL=your-email@example.com \\
   --env TIMETREE_PASSWORD=your-password \\
-  -- npx timetree-mcp
+  -- "$NODE_BIN" "$DIST_PATH"
 
 Then: Restart your terminal or run 'claude mcp refresh'
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -188,8 +190,8 @@ File: ~/.codex/config.toml
 
 [[mcp.servers]]
 name = "timetree"
-command = "npx"
-args = ["timetree-mcp"]
+command = "$NODE_BIN"
+args = ["$DIST_PATH"]
 
 [mcp.servers.env]
 TIMETREE_EMAIL = "your-email@example.com"
@@ -213,8 +215,8 @@ Or via UI: Click ⋮ (top right) → MCP Servers → Manage MCP Servers → View
 {
   "mcpServers": {
     "timetree": {
-      "command": "npx",
-      "args": ["timetree-mcp"],
+      "command": "$NODE_BIN",
+      "args": ["$DIST_PATH"],
       "env": {
         "TIMETREE_EMAIL": "your-email@example.com",
         "TIMETREE_PASSWORD": "your-password"
@@ -241,8 +243,8 @@ File: cline_mcp_settings.json
 {
   "mcpServers": {
     "timetree": {
-      "command": "npx",
-      "args": ["timetree-mcp"],
+      "command": "$NODE_BIN",
+      "args": ["$DIST_PATH"],
       "env": {
         "TIMETREE_EMAIL": "your-email@example.com",
         "TIMETREE_PASSWORD": "your-password"
@@ -264,8 +266,8 @@ EOF
 Most MCP clients support this standard format:
 
 {
-  "command": "npx",
-  "args": ["timetree-mcp"],
+  "command": "$NODE_BIN",
+  "args": ["$DIST_PATH"],
   "env": {
     "TIMETREE_EMAIL": "your-email@example.com",
     "TIMETREE_PASSWORD": "your-password"
@@ -276,7 +278,7 @@ With environment variables:
 
 export TIMETREE_EMAIL=your-email@example.com
 export TIMETREE_PASSWORD=your-password
-npx timetree-mcp
+"$NODE_BIN" "$DIST_PATH"
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 EOF
     ;;

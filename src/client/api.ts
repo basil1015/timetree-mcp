@@ -3,24 +3,42 @@
  * Handles all API calls to TimeTree with rate limiting and pagination.
  */
 
+import { randomUUID } from 'crypto';
 import { TIMETREE_CONFIG } from '../config/config.js';
 import { RateLimiter } from '../utils/rate-limiter.js';
 import { logger } from '../utils/logger.js';
 import { TimeTreeAuthManager } from './auth.js';
 import type {
   Calendar,
+  CalendarLabel,
+  CalendarLabelUpdateInput,
+  CalendarLabelsResponse,
+  CalendarUser,
+  CalendarUsersResponse,
+  CalendarVirtualUser,
+  CalendarVirtualUsersResponse,
   CalendarsResponse,
-  Event,
-  EventsSyncResponse,
   CreateEventInput,
   CreateEventResponse,
+  CreateMemoInput,
+  Event,
+  EventActivitiesResponse,
+  EventActivity,
+  EventActivityResponse,
+  EventsSyncResponse,
   UpdateEventInput,
   UpdateEventResponse,
+  UpdateMemoInput,
 } from '../types/timetree.js';
 import {
+  CalendarLabelsResponseSchema,
+  CalendarUsersResponseSchema,
+  CalendarVirtualUsersResponseSchema,
   CalendarsResponseSchema,
-  EventsSyncResponseSchema,
   CreateEventResponseSchema,
+  EventActivitiesResponseSchema,
+  EventActivityResponseSchema,
+  EventsSyncResponseSchema,
   UpdateEventResponseSchema,
 } from '../types/timetree.js';
 
@@ -38,6 +56,27 @@ export class InvalidCalendarError extends TimeTreeAPIError {
   }
 }
 
+function getStatusCode(error: unknown): number | undefined {
+  if (error && typeof error === 'object' && 'statusCode' in error) {
+    const statusCode = (error as { statusCode?: unknown }).statusCode;
+    return typeof statusCode === 'number' ? statusCode : undefined;
+  }
+  return undefined;
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function todayUtcMidnight(): number {
+  const now = new Date();
+  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+}
+
+function createClientUuid(): string {
+  return randomUUID().replace(/-/g, '');
+}
+
 export class TimeTreeAPIClient {
   private authManager: TimeTreeAuthManager;
   private rateLimiter: RateLimiter;
@@ -49,18 +88,14 @@ export class TimeTreeAPIClient {
     );
   }
 
-  /**
-   * Ensure we're authenticated before making API calls
-   */
+  /** Ensure we're authenticated before making API calls. */
   private async ensureAuthenticated(): Promise<void> {
     if (!this.authManager.isAuthenticated()) {
       await this.authManager.authenticate();
     }
   }
 
-  /**
-   * Get list of all calendars for the authenticated user
-   */
+  /** Get list of all calendars for the authenticated user. */
   async getCalendars(): Promise<Calendar[]> {
     await this.ensureAuthenticated();
 
@@ -75,12 +110,9 @@ export class TimeTreeAPIClient {
           .get<CalendarsResponse>(url);
       });
 
-      // Validate response
       const validated = CalendarsResponseSchema.parse(response);
-
-      // Filter out deactivated calendars
       const activeCalendars = validated.calendars.filter(
-        (cal) => !cal.deactivated_at
+        (calendar) => !calendar.deactivated_at
       );
 
       logger.info('Calendars fetched successfully', {
@@ -92,14 +124,12 @@ export class TimeTreeAPIClient {
     } catch (error) {
       logger.error('Failed to fetch calendars', { error });
       throw new TimeTreeAPIError(
-        `Failed to fetch calendars: ${(error as Error).message}`
+        `Failed to fetch calendars: ${getErrorMessage(error)}`
       );
     }
   }
 
-  /**
-   * Recursively sync events from a calendar with automatic pagination
-   */
+  /** Recursively sync events from a calendar with automatic pagination. */
   private async syncEvents(
     calendarId: string,
     since: number = 0,
@@ -118,13 +148,9 @@ export class TimeTreeAPIClient {
           .get<EventsSyncResponse>(url);
       });
 
-      // Validate response
       const validated = EventsSyncResponseSchema.parse(response);
-
-      // Accumulate events
       accumulated.push(...validated.events);
 
-      // Check if there are more chunks to fetch
       if (validated.chunk && validated.since > since) {
         logger.debug('More events to fetch', {
           nextSince: validated.since,
@@ -139,21 +165,18 @@ export class TimeTreeAPIClient {
 
       return accumulated;
     } catch (error) {
-      // Check for 404 - invalid calendar
-      if ((error as any).statusCode === 404) {
+      if (getStatusCode(error) === 404) {
         throw new InvalidCalendarError(calendarId);
       }
 
       logger.error('Failed to sync events', { calendarId, error });
       throw new TimeTreeAPIError(
-        `Failed to sync events: ${(error as Error).message}`
+        `Failed to sync events: ${getErrorMessage(error)}`
       );
     }
   }
 
-  /**
-   * Get all events from a calendar (handles pagination automatically)
-   */
+  /** Get all events from a calendar (handles pagination automatically). */
   async getEventsByCalendar(
     calendarId: string,
     since: number = 0
@@ -173,12 +196,8 @@ export class TimeTreeAPIClient {
   }
 
   /**
-   * Get events updated after a specific timestamp
+   * Get events updated after a specific timestamp.
    * This is more efficient than getEventsByCalendar when checking for recent changes.
-   *
-   * @param calendarId - The calendar ID to fetch events from
-   * @param updatedAfter - Unix timestamp in milliseconds. Only return events updated after this time.
-   * @returns Array of events that were updated after the specified timestamp
    */
   async getUpdatedEvents(
     calendarId: string,
@@ -188,7 +207,7 @@ export class TimeTreeAPIClient {
 
     logger.info('Fetching updated events for calendar', { calendarId, updatedAfter });
 
-    const url = `${TIMETREE_CONFIG.BASE_URL}/calendar/${calendarId}/events?since=${updatedAfter}`;
+    const url = `${TIMETREE_CONFIG.BASE_URL}${TIMETREE_CONFIG.ENDPOINTS.EVENTS(calendarId)}?since=${updatedAfter}`;
 
     try {
       const response = await this.rateLimiter.executeWithRetry(async () => {
@@ -197,10 +216,7 @@ export class TimeTreeAPIClient {
           .get<EventsSyncResponse>(url);
       });
 
-      // Validate response
       const validated = EventsSyncResponseSchema.parse(response);
-
-      // Filter events by updated_at timestamp
       const updatedEvents = validated.events.filter(
         (event) => event.updated_at && event.updated_at > updatedAfter
       );
@@ -212,34 +228,177 @@ export class TimeTreeAPIClient {
 
       return updatedEvents;
     } catch (error) {
-      // Check for 404 - invalid calendar
-      if ((error as any).statusCode === 404) {
+      if (getStatusCode(error) === 404) {
         throw new InvalidCalendarError(calendarId);
       }
 
       logger.error('Failed to fetch updated events', { calendarId, error });
       throw new TimeTreeAPIError(
-        `Failed to fetch updated events: ${(error as Error).message}`
+        `Failed to fetch updated events: ${getErrorMessage(error)}`
       );
     }
   }
 
-  /**
-   * Verify a calendar exists
-   */
+  /** Verify a calendar exists. */
   async verifyCalendar(calendarId: string): Promise<boolean> {
     const calendars = await this.getCalendars();
-    return calendars.some((cal) => cal.id.toString() === calendarId);
+    return calendars.some((calendar) => calendar.id.toString() === calendarId);
   }
 
   // ============================================================================
-  // CRUD Operations
+  // Calendar metadata operations
   // ============================================================================
 
-  /**
-   * Create a new event in a calendar
-   * Requires CSRF token for authentication
-   */
+  async getCalendarLabels(calendarId: string): Promise<CalendarLabel[]> {
+    await this.ensureAuthenticated();
+
+    logger.info('Fetching calendar labels', { calendarId });
+    const url = `${TIMETREE_CONFIG.BASE_URL}${TIMETREE_CONFIG.ENDPOINTS.CALENDAR_LABELS(calendarId)}`;
+
+    try {
+      const response = await this.rateLimiter.executeWithRetry(async () => {
+        return await this.authManager
+          .getHttpClient()
+          .get<CalendarLabelsResponse>(url);
+      });
+
+      const validated = CalendarLabelsResponseSchema.parse(response);
+      return validated.calendar_labels;
+    } catch (error) {
+      if (getStatusCode(error) === 404) {
+        throw new InvalidCalendarError(calendarId);
+      }
+      logger.error('Failed to fetch calendar labels', { calendarId, error });
+      throw new TimeTreeAPIError(
+        `Failed to fetch calendar labels: ${getErrorMessage(error)}`
+      );
+    }
+  }
+
+  async updateCalendarLabels(
+    calendarId: string,
+    labelUpdates: CalendarLabelUpdateInput[]
+  ): Promise<CalendarLabel[]> {
+    await this.ensureAuthenticated();
+
+    logger.info('Updating calendar labels', {
+      calendarId,
+      update_count: labelUpdates.length,
+      label_ids: labelUpdates.map((label) => label.id),
+    });
+
+    const currentLabels = await this.getCalendarLabels(calendarId);
+    const updatesById = new Map(labelUpdates.map((label) => [label.id, label]));
+    const currentIds = new Set(currentLabels.map((label) => label.id));
+
+    const mergedLabels = currentLabels.map((label) => {
+      const update = updatesById.get(label.id);
+      return {
+        id: label.id,
+        name: update?.name ?? label.name ?? '',
+        color: update?.color ?? label.color ?? label.default_color,
+      };
+    });
+
+    for (const update of labelUpdates) {
+      if (currentIds.has(update.id)) continue;
+      if (update.color === undefined) {
+        throw new TimeTreeAPIError(
+          `Cannot add unknown label ${update.id} without color`,
+          400
+        );
+      }
+      mergedLabels.push({
+        id: update.id,
+        name: update.name ?? '',
+        color: update.color,
+      });
+    }
+
+    const url = `${TIMETREE_CONFIG.BASE_URL}${TIMETREE_CONFIG.ENDPOINTS.CALENDAR_LABELS(calendarId)}`;
+    const body = { calendar_labels: mergedLabels };
+
+    try {
+      const response = await this.rateLimiter.executeWithRetry(async () => {
+        return await this.authManager
+          .getHttpClient()
+          .put<CalendarLabelsResponse>(url, body, undefined, true);
+      });
+
+      const parsed = CalendarLabelsResponseSchema.safeParse(response);
+      return parsed.success ? parsed.data.calendar_labels : this.getCalendarLabels(calendarId);
+    } catch (error) {
+      if (getStatusCode(error) === 404) {
+        throw new InvalidCalendarError(calendarId);
+      }
+      if (getStatusCode(error) === 403) {
+        throw new TimeTreeAPIError('CSRF token missing or invalid - re-authentication required', 403);
+      }
+      logger.error('Failed to update calendar labels', { calendarId, error });
+      throw new TimeTreeAPIError(
+        `Failed to update calendar labels: ${getErrorMessage(error)}`,
+        getStatusCode(error)
+      );
+    }
+  }
+
+  async getCalendarMembers(calendarId: string): Promise<CalendarUser[]> {
+    await this.ensureAuthenticated();
+
+    logger.info('Fetching calendar members', { calendarId });
+    const url = `${TIMETREE_CONFIG.V2_BASE_URL}${TIMETREE_CONFIG.ENDPOINTS.CALENDAR_MEMBERS_V2(calendarId)}`;
+
+    try {
+      const response = await this.rateLimiter.executeWithRetry(async () => {
+        return await this.authManager
+          .getHttpClient()
+          .get<CalendarUsersResponse>(url);
+      });
+
+      const validated = CalendarUsersResponseSchema.parse(response);
+      return validated.calendar_users;
+    } catch (error) {
+      if (getStatusCode(error) === 404) {
+        throw new InvalidCalendarError(calendarId);
+      }
+      logger.error('Failed to fetch calendar members', { calendarId, error });
+      throw new TimeTreeAPIError(
+        `Failed to fetch calendar members: ${getErrorMessage(error)}`
+      );
+    }
+  }
+
+  async getCalendarVirtualUsers(calendarId: string): Promise<CalendarVirtualUser[]> {
+    await this.ensureAuthenticated();
+
+    logger.info('Fetching calendar virtual users', { calendarId });
+    const url = `${TIMETREE_CONFIG.BASE_URL}${TIMETREE_CONFIG.ENDPOINTS.CALENDAR_VIRTUAL_USERS(calendarId)}`;
+
+    try {
+      const response = await this.rateLimiter.executeWithRetry(async () => {
+        return await this.authManager
+          .getHttpClient()
+          .get<CalendarVirtualUsersResponse>(url);
+      });
+
+      const validated = CalendarVirtualUsersResponseSchema.parse(response);
+      return validated.calendar_virtual_users;
+    } catch (error) {
+      if (getStatusCode(error) === 404) {
+        throw new InvalidCalendarError(calendarId);
+      }
+      logger.error('Failed to fetch calendar virtual users', { calendarId, error });
+      throw new TimeTreeAPIError(
+        `Failed to fetch calendar virtual users: ${getErrorMessage(error)}`
+      );
+    }
+  }
+
+  // ============================================================================
+  // Event CRUD operations
+  // ============================================================================
+
+  /** Create a new event in a calendar. Requires CSRF token for authentication. */
   async createEvent(calendarId: string, eventData: CreateEventInput): Promise<Event> {
     await this.ensureAuthenticated();
 
@@ -251,10 +410,9 @@ export class TimeTreeAPIClient {
       const response = await this.rateLimiter.executeWithRetry(async () => {
         return await this.authManager
           .getHttpClient()
-          .post<CreateEventResponse>(url, eventData, undefined, true); // requiresCsrf=true
+          .post<CreateEventResponse>(url, eventData, undefined, true);
       });
 
-      // Validate response
       const validated = CreateEventResponseSchema.parse(response);
 
       logger.info('Event created successfully', {
@@ -264,27 +422,24 @@ export class TimeTreeAPIClient {
 
       return validated.event;
     } catch (error) {
-      // Check for specific error codes
-      if ((error as any).statusCode === 404) {
+      if (getStatusCode(error) === 404) {
         throw new InvalidCalendarError(calendarId);
       }
 
-      if ((error as any).statusCode === 403) {
+      if (getStatusCode(error) === 403) {
         logger.error('CSRF token missing or invalid', { error });
         throw new TimeTreeAPIError('CSRF token missing or invalid - re-authentication required', 403);
       }
 
       logger.error('Failed to create event', { calendarId, error });
       throw new TimeTreeAPIError(
-        `Failed to create event: ${(error as Error).message}`
+        `Failed to create event: ${getErrorMessage(error)}`,
+        getStatusCode(error)
       );
     }
   }
 
-  /**
-   * Update an existing event
-   * Requires CSRF token for authentication
-   */
+  /** Update an existing event. Requires CSRF token for authentication. */
   async updateEvent(
     calendarId: string,
     eventUuid: string,
@@ -303,10 +458,9 @@ export class TimeTreeAPIClient {
       const response = await this.rateLimiter.executeWithRetry(async () => {
         return await this.authManager
           .getHttpClient()
-          .put<UpdateEventResponse>(url, updateData, undefined, true); // requiresCsrf=true
+          .put<UpdateEventResponse>(url, updateData, undefined, true);
       });
 
-      // Validate response
       const validated = UpdateEventResponseSchema.parse(response);
 
       logger.info('Event updated successfully', {
@@ -316,44 +470,71 @@ export class TimeTreeAPIClient {
 
       return validated.event;
     } catch (error) {
-      // Check for specific error codes
-      if ((error as any).statusCode === 404) {
+      if (getStatusCode(error) === 404) {
         throw new TimeTreeAPIError(`Event not found: ${eventUuid}`, 404);
       }
 
-      if ((error as any).statusCode === 403) {
+      if (getStatusCode(error) === 403) {
         logger.error('CSRF token missing or invalid', { error });
         throw new TimeTreeAPIError('CSRF token missing or invalid - re-authentication required', 403);
       }
 
       logger.error('Failed to update event', { calendarId, eventUuid, error });
       throw new TimeTreeAPIError(
-        `Failed to update event: ${(error as Error).message}`
+        `Failed to update event: ${getErrorMessage(error)}`,
+        getStatusCode(error)
       );
     }
   }
 
-  /**
-   * Fetch a single event by UUID using the sync endpoint with targeted search.
-   * Falls back to full sync only if needed.
-   */
+  /** Fetch a single event by UUID using the sync endpoint with targeted search. */
   private async getEventByUuid(calendarId: string, eventUuid: string): Promise<Event | null> {
     const events = await this.syncEvents(calendarId, 0);
-    return events.find((e) => e.uuid === eventUuid) || null;
+    return events.find((event) => event.uuid === eventUuid) || null;
   }
 
   /**
-   * Delete an event from a calendar
+   * Delete an event from a calendar.
    *
-   * NOTE: TimeTree's DELETE endpoint requires the full event data in the request body.
-   * This is unusual for a DELETE operation, but required by TimeTree's API.
-   *
-   * Requires CSRF token for authentication.
+   * The current web API accepts a no-body DELETE. If an older/variant endpoint rejects
+   * that shape, fall back to the previously observed full-event-body DELETE.
    */
   async deleteEvent(calendarId: string, eventUuid: string): Promise<void> {
     await this.ensureAuthenticated();
 
     logger.info('Deleting event', { calendarId, eventUuid });
+
+    const url = `${TIMETREE_CONFIG.BASE_URL}${TIMETREE_CONFIG.ENDPOINTS.DELETE_EVENT(
+      calendarId,
+      eventUuid
+    )}`;
+
+    try {
+      await this.rateLimiter.executeWithRetry(async () => {
+        return await this.authManager
+          .getHttpClient()
+          .delete(url, undefined, undefined, true);
+      });
+
+      logger.info('Event deleted successfully', { calendarId, eventUuid });
+      return;
+    } catch (error) {
+      const statusCode = getStatusCode(error);
+
+      if (statusCode === 404) {
+        throw new TimeTreeAPIError(`Event not found: ${eventUuid}`, 404);
+      }
+
+      if (statusCode === 403) {
+        throw new TimeTreeAPIError('CSRF token missing or invalid - re-authentication required', 403);
+      }
+
+      logger.debug('No-body event delete failed; retrying with full event body', {
+        calendarId,
+        eventUuid,
+        statusCode,
+      });
+    }
 
     try {
       const targetEvent = await this.getEventByUuid(calendarId, eventUuid);
@@ -362,34 +543,251 @@ export class TimeTreeAPIClient {
         throw new TimeTreeAPIError(`Event not found: ${eventUuid}`, 404);
       }
 
-      const url = `${TIMETREE_CONFIG.BASE_URL}${TIMETREE_CONFIG.ENDPOINTS.DELETE_EVENT(
-        calendarId,
-        eventUuid
-      )}`;
-
       await this.rateLimiter.executeWithRetry(async () => {
         return await this.authManager
           .getHttpClient()
           .delete(url, targetEvent, undefined, true);
       });
 
-      logger.info('Event deleted successfully', { calendarId, eventUuid });
+      logger.info('Event deleted successfully after fallback', { calendarId, eventUuid });
     } catch (error) {
       if (error instanceof TimeTreeAPIError) {
         throw error;
       }
 
-      if ((error as any).statusCode === 404) {
-        throw new InvalidCalendarError(calendarId);
+      if (getStatusCode(error) === 404) {
+        throw new TimeTreeAPIError(`Event not found: ${eventUuid}`, 404);
       }
 
-      if ((error as any).statusCode === 403) {
+      if (getStatusCode(error) === 403) {
         throw new TimeTreeAPIError('CSRF token missing or invalid - re-authentication required', 403);
       }
 
       logger.error('Failed to delete event', { calendarId, eventUuid, error });
       throw new TimeTreeAPIError(
-        `Failed to delete event: ${(error as Error).message}`
+        `Failed to delete event: ${getErrorMessage(error)}`,
+        getStatusCode(error)
+      );
+    }
+  }
+
+  // ============================================================================
+  // Memo wrappers (TimeTree stores memos as category=2 events)
+  // ============================================================================
+
+  async getMemosByCalendar(calendarId: string): Promise<Event[]> {
+    const events = await this.getEventsByCalendar(calendarId, 0);
+    return events.filter((event) => event.category === 2 && !event.deactivated_at);
+  }
+
+  async createMemo(calendarId: string, memoData: CreateMemoInput): Promise<Event> {
+    const startAt = memoData.start_at ?? todayUtcMidnight();
+    const attachment = memoData.checklist !== undefined || memoData.virtual_user_attendees !== undefined
+      ? {
+          ...(memoData.checklist !== undefined && { checklist: memoData.checklist }),
+          ...(memoData.virtual_user_attendees !== undefined && {
+            virtual_user_attendees: memoData.virtual_user_attendees,
+          }),
+        }
+      : undefined;
+
+    return this.createEvent(calendarId, {
+      title: memoData.title,
+      all_day: true,
+      start_at: startAt,
+      start_timezone: 'UTC',
+      end_at: startAt,
+      end_timezone: 'UTC',
+      label_id: memoData.label_id,
+      category: 2,
+      note: memoData.note,
+      location: memoData.location,
+      url: memoData.url,
+      attendees: [],
+      recurrences: [],
+      alerts: [],
+      file_uuids: [],
+      attachment,
+    });
+  }
+
+  async updateMemo(
+    calendarId: string,
+    memoUuid: string,
+    memoData: UpdateMemoInput
+  ): Promise<Event> {
+    const attachment = memoData.checklist !== undefined || memoData.virtual_user_attendees !== undefined
+      ? {
+          ...(memoData.checklist !== undefined && { checklist: memoData.checklist }),
+          ...(memoData.virtual_user_attendees !== undefined && {
+            virtual_user_attendees: memoData.virtual_user_attendees,
+          }),
+        }
+      : undefined;
+
+    return this.updateEvent(calendarId, memoUuid, {
+      title: memoData.title,
+      label_id: memoData.label_id,
+      category: 2,
+      note: memoData.note,
+      location: memoData.location,
+      url: memoData.url,
+      attachment,
+    });
+  }
+
+  async deleteMemo(calendarId: string, memoUuid: string): Promise<void> {
+    await this.deleteEvent(calendarId, memoUuid);
+  }
+
+  // ============================================================================
+  // Event comments/activities
+  // ============================================================================
+
+  async addEventComment(
+    calendarId: string,
+    eventUuid: string,
+    content: string,
+    silent: boolean = true
+  ): Promise<EventActivity> {
+    await this.ensureAuthenticated();
+
+    logger.info('Adding event comment', { calendarId, eventUuid });
+
+    const url = `${TIMETREE_CONFIG.BASE_URL}${TIMETREE_CONFIG.ENDPOINTS.EVENT_ACTIVITY(calendarId, eventUuid)}`;
+    const body = {
+      id: createClientUuid(),
+      attachment: { content },
+      silent,
+    };
+
+    try {
+      const response = await this.rateLimiter.executeWithRetry(async () => {
+        return await this.authManager
+          .getHttpClient()
+          .post<EventActivityResponse>(url, body, undefined, true);
+      });
+
+      const validated = EventActivityResponseSchema.parse(response);
+      return validated.event_activity;
+    } catch (error) {
+      if (getStatusCode(error) === 404) {
+        throw new TimeTreeAPIError(`Event not found: ${eventUuid}`, 404);
+      }
+      if (getStatusCode(error) === 403) {
+        throw new TimeTreeAPIError('CSRF token missing or invalid - re-authentication required', 403);
+      }
+      logger.error('Failed to add event comment', { calendarId, eventUuid, error });
+      throw new TimeTreeAPIError(
+        `Failed to add event comment: ${getErrorMessage(error)}`,
+        getStatusCode(error)
+      );
+    }
+  }
+
+  async listEventComments(calendarId: string, eventUuid: string): Promise<EventActivity[]> {
+    await this.ensureAuthenticated();
+
+    logger.info('Listing event comments', { calendarId, eventUuid });
+
+    const url = `${TIMETREE_CONFIG.BASE_URL}${TIMETREE_CONFIG.ENDPOINTS.EVENT_ACTIVITIES(calendarId, eventUuid)}`;
+
+    try {
+      const response = await this.rateLimiter.executeWithRetry(async () => {
+        return await this.authManager
+          .getHttpClient()
+          .get<EventActivitiesResponse>(url);
+      });
+
+      const validated = EventActivitiesResponseSchema.parse(response);
+      return validated.event_activities.filter(
+        (activity) => activity.type === 0 && !activity.deactivated_at
+      );
+    } catch (error) {
+      if (getStatusCode(error) === 404) {
+        throw new TimeTreeAPIError(`Event not found: ${eventUuid}`, 404);
+      }
+      logger.error('Failed to list event comments', { calendarId, eventUuid, error });
+      throw new TimeTreeAPIError(
+        `Failed to list event comments: ${getErrorMessage(error)}`,
+        getStatusCode(error)
+      );
+    }
+  }
+
+  async updateEventComment(
+    calendarId: string,
+    eventUuid: string,
+    commentId: string,
+    content: string
+  ): Promise<EventActivity> {
+    await this.ensureAuthenticated();
+
+    logger.info('Updating event comment', { calendarId, eventUuid, commentId });
+
+    const url = `${TIMETREE_CONFIG.BASE_URL}${TIMETREE_CONFIG.ENDPOINTS.EVENT_ACTIVITY_BY_ID(
+      calendarId,
+      eventUuid,
+      commentId
+    )}`;
+    const body = { attachment: { content } };
+
+    try {
+      const response = await this.rateLimiter.executeWithRetry(async () => {
+        return await this.authManager
+          .getHttpClient()
+          .put<EventActivityResponse>(url, body, undefined, true);
+      });
+
+      const validated = EventActivityResponseSchema.parse(response);
+      return validated.event_activity;
+    } catch (error) {
+      if (getStatusCode(error) === 404) {
+        throw new TimeTreeAPIError(`Comment not found: ${commentId}`, 404);
+      }
+      if (getStatusCode(error) === 403) {
+        throw new TimeTreeAPIError('CSRF token missing or invalid - re-authentication required', 403);
+      }
+      logger.error('Failed to update event comment', { calendarId, eventUuid, commentId, error });
+      throw new TimeTreeAPIError(
+        `Failed to update event comment: ${getErrorMessage(error)}`,
+        getStatusCode(error)
+      );
+    }
+  }
+
+  async deleteEventComment(
+    calendarId: string,
+    eventUuid: string,
+    commentId: string
+  ): Promise<void> {
+    await this.ensureAuthenticated();
+
+    logger.info('Deleting event comment', { calendarId, eventUuid, commentId });
+
+    const url = `${TIMETREE_CONFIG.BASE_URL}${TIMETREE_CONFIG.ENDPOINTS.EVENT_ACTIVITY_BY_ID(
+      calendarId,
+      eventUuid,
+      commentId
+    )}`;
+
+    try {
+      await this.rateLimiter.executeWithRetry(async () => {
+        return await this.authManager
+          .getHttpClient()
+          .delete(url, undefined, undefined, true);
+      });
+    } catch (error) {
+      if (getStatusCode(error) === 404) {
+        throw new TimeTreeAPIError(`Comment not found: ${commentId}`, 404);
+      }
+      if (getStatusCode(error) === 403) {
+        throw new TimeTreeAPIError('CSRF token missing or invalid - re-authentication required', 403);
+      }
+      logger.error('Failed to delete event comment', { calendarId, eventUuid, commentId, error });
+      throw new TimeTreeAPIError(
+        `Failed to delete event comment: ${getErrorMessage(error)}`,
+        getStatusCode(error)
       );
     }
   }

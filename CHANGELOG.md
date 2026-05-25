@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-05-25
+
+### Added
+- Added memo tools: `list_memos`, `create_memo`, `update_memo`, and `delete_memo`.
+- Added event comment tools: `add_event_comment`, `list_event_comments`, `update_event_comment`, and `delete_event_comment`.
+- Added calendar metadata tools: `get_calendar_labels`, `update_calendar_labels`, `get_calendar_members`, and `get_calendar_virtual_members`.
+- Added Node test coverage for API endpoint contracts, tool registration/pass-through behavior, memo wrappers, and logger sanitization.
+
+### Changed
+- Expanded `create_event` and `update_event` to expose attendees, virtual attendees, alerts, RRULE recurrences, attached file UUIDs, and category overrides.
+- Updated event deletion to use the verified no-body DELETE path first, with a full-event-body fallback for older API behavior.
+- Updated CI to run typecheck, unit tests, and high-severity audit checks.
+- Updated installation docs to emphasize local clone/link usage instead of implying npm registry publication.
+- Added shared ignores for generated test/runtime artifacts.
+
+### Security
+- Hardened structured logging with recursive masking for credentials, sessions, CSRF tokens, request/response bodies, event titles, notes, locations, URLs, comments, and attachments.
+- Removed raw MCP tool argument logging; logs now include argument shape only.
+- Updated transitive dependencies with `npm audit fix`; audit reports 0 known vulnerabilities.
+
 ## [0.2.1] - 2026-05-10
 
 ### Added

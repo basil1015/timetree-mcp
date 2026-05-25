@@ -8,6 +8,107 @@ import type { TimeTreeAPIClient } from '../client/api.js';
 import { InvalidCalendarError, TimeTreeAPIError } from '../client/api.js';
 import { logger } from '../utils/logger.js';
 import { getLabelColorName } from '../types/label-colors.js';
+import type { ChecklistItem, Event } from '../types/timetree.js';
+
+const ChecklistSchema = z.array(z.object({
+  checked: z.boolean().default(false).describe('Whether the checklist item is checked'),
+  title: z.string().min(1).describe('Checklist item title'),
+}));
+
+const VirtualUserAttendeesSchema = z.array(z.union([z.string(), z.number()]));
+
+function buildAttachment(
+  checklist?: ChecklistItem[],
+  virtualUserAttendees?: Array<string | number>
+) {
+  if (checklist === undefined && virtualUserAttendees === undefined) {
+    return undefined;
+  }
+
+  return {
+    ...(checklist !== undefined && { checklist }),
+    ...(virtualUserAttendees !== undefined && { virtual_user_attendees: virtualUserAttendees }),
+  };
+}
+
+function formatEvent(event: Event) {
+  return {
+    uuid: event.uuid,
+    calendar_id: event.calendar_id,
+    title: event.title,
+    start_at: new Date(event.start_at).toISOString(),
+    start_timezone: event.start_timezone || null,
+    end_at: new Date(event.end_at).toISOString(),
+    end_timezone: event.end_timezone || null,
+    all_day: event.all_day,
+    label_id: event.label_id || null,
+    label_color: event.label_id ? getLabelColorName(event.label_id) : null,
+    location: event.location || null,
+    note: event.note || null,
+    url: event.url || null,
+    category: event.category || null,
+    attendees: event.attendees || [],
+    alerts: event.alerts || [],
+    recurrences: event.recurrences || [],
+    checklist: event.attachment?.checklist || null,
+    virtual_user_attendees: event.attachment?.virtual_user_attendees || [],
+    created_at: event.created_at ? new Date(event.created_at).toISOString() : null,
+    updated_at: event.updated_at ? new Date(event.updated_at).toISOString() : null,
+  };
+}
+
+function errorContent(error: string, message: string, details?: unknown) {
+  return {
+    content: [
+      {
+        type: 'text',
+        text: JSON.stringify(
+          {
+            error,
+            message,
+            ...(details !== undefined && { details }),
+          },
+          null,
+          2
+        ),
+      },
+    ],
+    isError: true,
+  };
+}
+
+function commonWriteError(error: unknown, action: string) {
+  if (error instanceof InvalidCalendarError) {
+    return errorContent(
+      'Invalid calendar',
+      'Calendar not found. Please use list_calendars to get valid calendar IDs.'
+    );
+  }
+
+  if (error instanceof TimeTreeAPIError && error.statusCode === 404) {
+    return errorContent(
+      'Event not found',
+      'The specified event UUID does not exist. Please use get_events to find valid event UUIDs.'
+    );
+  }
+
+  if (error instanceof TimeTreeAPIError && error.statusCode === 403) {
+    return errorContent(
+      'Authentication failed',
+      'CSRF token missing or invalid. Please try again.'
+    );
+  }
+
+  if ((error as { name?: string }).name === 'ZodError') {
+    return errorContent(
+      'Invalid input',
+      `Please provide valid data to ${action}`,
+      (error as { errors?: unknown }).errors
+    );
+  }
+
+  return errorContent(`Failed to ${action}`, (error as Error).message);
+}
 
 // ============================================================================
 // Create Event Tool
@@ -22,14 +123,16 @@ export const CreateEventInputSchema = z.object({
   end_at: z.number().describe('Event end time as Unix timestamp in milliseconds'),
   end_timezone: z.string().default('UTC').describe('End timezone (e.g., "Asia/Seoul", "America/New_York")'),
   label_id: z.number().min(1).max(10).optional().describe('Color label ID (1-10). See description for color mapping.'),
-  category: z.number().default(1).describe('Event category (default: 1)'),
+  category: z.number().default(1).describe('Event category (default: 1; memos use category=2)'),
   note: z.string().optional().describe('Event notes/description'),
   location: z.string().optional().describe('Event location'),
   url: z.string().optional().describe('Related URL'),
-  checklist: z.array(z.object({
-    checked: z.boolean().default(false).describe('Whether the checklist item is checked'),
-    title: z.string().min(1).describe('Checklist item title'),
-  })).optional().describe('Checklist items to attach to the event'),
+  attendees: z.array(z.number()).optional().describe('Calendar user IDs attending this event'),
+  recurrences: z.array(z.string()).optional().describe('RRULE strings, e.g. ["RRULE:FREQ=DAILY;COUNT=2"]'),
+  alerts: z.array(z.number()).optional().describe('Notification offsets in minutes, e.g. [5, 30]'),
+  file_uuids: z.array(z.string()).optional().describe('Attached file UUIDs if already uploaded'),
+  checklist: ChecklistSchema.optional().describe('Checklist items to attach to the event'),
+  virtual_user_attendees: VirtualUserAttendeesSchema.optional().describe('Virtual member IDs/names attending this event'),
 });
 
 export function createCreateEventTool(apiClient: TimeTreeAPIClient) {
@@ -40,7 +143,7 @@ export function createCreateEventTool(apiClient: TimeTreeAPIClient) {
       'Returns the created event with UUID. ' +
       'Label colors (label_id 1-10): 1=Emerald green, 2=Modern cyan, 3=Deep sky blue, 4=Pastel brown, ' +
       '5=Midnight black, 6=Apple red, 7=French rose, 8=Coral pink, 9=Bright orange, 10=Soft violet. ' +
-      'Supports attaching checklist items.',
+      'Supports checklist, attendees, virtual attendees, alerts, RRULE recurrence strings, and category override.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -48,21 +151,14 @@ export function createCreateEventTool(apiClient: TimeTreeAPIClient) {
           type: 'number',
           description: 'The calendar ID to create the event in (use list_calendars to get valid IDs)',
         },
-        title: {
-          type: 'string',
-          description: 'Event title (required)',
-        },
+        title: { type: 'string', description: 'Event title (required)' },
         all_day: {
           type: 'boolean',
-          description: 'Whether this is an all-day event (default: false). ' +
-            'IMPORTANT: For all-day events, TimeTree uses INCLUSIVE end dates. ' +
-            'Example: Feb 15-16 event should have start_at=Feb 15 00:00 and end_at=Feb 16 00:00 (NOT Feb 17).',
+          description: 'Whether this is an all-day event (default: false). TimeTree uses inclusive end dates for all-day events.',
         },
         start_at: {
           type: 'number',
-          description: 'Event start time as Unix timestamp in milliseconds. ' +
-            'For all-day events, use midnight (00:00:00) of the start date. ' +
-            'Example: new Date("2026-02-15T00:00:00Z").getTime() = 1739577600000',
+          description: 'Event start time as Unix timestamp in milliseconds. For all-day events, use midnight of the start date.',
         },
         start_timezone: {
           type: 'string',
@@ -70,34 +166,36 @@ export function createCreateEventTool(apiClient: TimeTreeAPIClient) {
         },
         end_at: {
           type: 'number',
-          description: 'Event end time as Unix timestamp in milliseconds. ' +
-            'IMPORTANT: For all-day events, TimeTree uses INCLUSIVE end dates. ' +
-            'To create Feb 15-16 event, set end_at to Feb 16 midnight (NOT Feb 17). ' +
-            'Example: Feb 15-16 event → end_at=new Date("2026-02-16T00:00:00Z").getTime()',
+          description: 'Event end time as Unix timestamp in milliseconds. For all-day events, TimeTree uses an inclusive end date.',
         },
-        end_timezone: {
-          type: 'string',
-          description: 'End timezone (default: UTC)',
-        },
+        end_timezone: { type: 'string', description: 'End timezone (default: UTC)' },
         label_id: {
           type: 'number',
           description: 'Color label ID (1-10). 1=Emerald, 2=Cyan, 3=Blue, 4=Brown, 5=Black, 6=Red, 7=Rose, 8=Pink, 9=Orange, 10=Violet',
         },
-        category: {
-          type: 'number',
-          description: 'Event category (default: 1)',
+        category: { type: 'number', description: 'Event category (default: 1; memos use category=2)' },
+        note: { type: 'string', description: 'Event notes/description' },
+        location: { type: 'string', description: 'Event location' },
+        url: { type: 'string', description: 'Related URL' },
+        attendees: {
+          type: 'array',
+          description: 'Calendar user IDs attending this event',
+          items: { type: 'number' },
         },
-        note: {
-          type: 'string',
-          description: 'Event notes/description',
+        recurrences: {
+          type: 'array',
+          description: 'RRULE strings, e.g. ["RRULE:FREQ=DAILY;COUNT=2"]',
+          items: { type: 'string' },
         },
-        location: {
-          type: 'string',
-          description: 'Event location',
+        alerts: {
+          type: 'array',
+          description: 'Notification offsets in minutes before the event, e.g. [5, 30]',
+          items: { type: 'number' },
         },
-        url: {
-          type: 'string',
-          description: 'Related URL',
+        file_uuids: {
+          type: 'array',
+          description: 'Attached file UUIDs if already uploaded',
+          items: { type: 'string' },
         },
         checklist: {
           type: 'array',
@@ -110,6 +208,11 @@ export function createCreateEventTool(apiClient: TimeTreeAPIClient) {
             },
             required: ['title'],
           },
+        },
+        virtual_user_attendees: {
+          type: 'array',
+          description: 'Virtual member IDs/names attending this event',
+          items: { oneOf: [{ type: 'string' }, { type: 'number' }] },
         },
       },
       required: ['calendar_id', 'title', 'start_at', 'end_at'],
@@ -131,34 +234,12 @@ export function createCreateEventTool(apiClient: TimeTreeAPIClient) {
           note: input.note,
           location: input.location,
           url: input.url,
-          recurrences: [],
-          alerts: [],
-          file_uuids: [],
-          attachment: input.checklist
-            ? { checklist: input.checklist, virtual_user_attendees: [] }
-            : undefined,
+          attendees: input.attendees ?? [],
+          recurrences: input.recurrences ?? [],
+          alerts: input.alerts ?? [],
+          file_uuids: input.file_uuids ?? [],
+          attachment: buildAttachment(input.checklist, input.virtual_user_attendees),
         });
-
-        // Format event for output
-        const formattedEvent = {
-          uuid: event.uuid,
-          calendar_id: event.calendar_id,
-          title: event.title,
-          start_at: new Date(event.start_at).toISOString(),
-          start_timezone: event.start_timezone || null,
-          end_at: new Date(event.end_at).toISOString(),
-          end_timezone: event.end_timezone || null,
-          all_day: event.all_day,
-          label_id: event.label_id || null,
-          label_color: event.label_id ? getLabelColorName(event.label_id) : null,
-          location: event.location || null,
-          note: event.note || null,
-          url: event.url || null,
-          category: event.category || null,
-          checklist: event.attachment?.checklist || null,
-          created_at: event.created_at ? new Date(event.created_at).toISOString() : null,
-          updated_at: event.updated_at ? new Date(event.updated_at).toISOString() : null,
-        };
 
         logger.info('Tool: create_event completed', { uuid: event.uuid });
 
@@ -170,7 +251,7 @@ export function createCreateEventTool(apiClient: TimeTreeAPIClient) {
                 {
                   success: true,
                   message: 'Event created successfully',
-                  event: formattedEvent,
+                  event: formatEvent(event),
                 },
                 null,
                 2
@@ -180,81 +261,7 @@ export function createCreateEventTool(apiClient: TimeTreeAPIClient) {
         };
       } catch (error) {
         logger.error('Tool: create_event failed', { error });
-
-        if (error instanceof InvalidCalendarError) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: JSON.stringify(
-                  {
-                    error: 'Invalid calendar',
-                    message: 'Calendar not found. Please use list_calendars to get valid calendar IDs.',
-                  },
-                  null,
-                  2
-                ),
-              },
-            ],
-            isError: true,
-          };
-        }
-
-        if (error instanceof TimeTreeAPIError && error.statusCode === 403) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: JSON.stringify(
-                  {
-                    error: 'Authentication failed',
-                    message: 'CSRF token missing or invalid. Please try again (token will be refreshed automatically).',
-                  },
-                  null,
-                  2
-                ),
-              },
-            ],
-            isError: true,
-          };
-        }
-
-        if ((error as any).name === 'ZodError') {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: JSON.stringify(
-                  {
-                    error: 'Invalid input',
-                    message: 'Please provide valid event data',
-                    details: (error as any).errors,
-                  },
-                  null,
-                  2
-                ),
-              },
-            ],
-            isError: true,
-          };
-        }
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(
-                {
-                  error: 'Failed to create event',
-                  message: (error as Error).message,
-                },
-                null,
-                2
-              ),
-            },
-          ],
-          isError: true,
-        };
+        return commonWriteError(error, 'create event');
       }
     },
   };
@@ -278,10 +285,12 @@ export const UpdateEventInputSchema = z.object({
   note: z.string().optional().describe('New event notes'),
   location: z.string().optional().describe('New event location'),
   url: z.string().optional().describe('New related URL'),
-  checklist: z.array(z.object({
-    checked: z.boolean().default(false).describe('Whether the checklist item is checked'),
-    title: z.string().min(1).describe('Checklist item title'),
-  })).optional().describe('Replace the event checklist items'),
+  attendees: z.array(z.number()).optional().describe('Replace calendar user attendee IDs'),
+  recurrences: z.array(z.string()).optional().describe('Replace recurrence RRULE strings'),
+  alerts: z.array(z.number()).optional().describe('Replace notification offsets in minutes'),
+  file_uuids: z.array(z.string()).optional().describe('Replace attached file UUIDs'),
+  checklist: ChecklistSchema.optional().describe('Replace event checklist items; use [] to clear checklist'),
+  virtual_user_attendees: VirtualUserAttendeesSchema.optional().describe('Replace virtual member attendees; use [] to clear'),
 });
 
 export function createUpdateEventTool(apiClient: TimeTreeAPIClient) {
@@ -290,71 +299,46 @@ export function createUpdateEventTool(apiClient: TimeTreeAPIClient) {
     description:
       'Update an existing event in a TimeTree calendar. Only provide the fields you want to change. ' +
       'Requires CSRF token (automatically managed). Returns the updated event. ' +
-      'Label colors (label_id 1-10): 1=Emerald green, 2=Modern cyan, 3=Deep sky blue, 4=Pastel brown, ' +
-      '5=Midnight black, 6=Apple red, 7=French rose, 8=Coral pink, 9=Bright orange, 10=Soft violet. ' +
-      'Supports attaching checklist items.',
+      'Supports checklist, attendees, virtual attendees, alerts, RRULE recurrence strings, and category override.',
     inputSchema: {
       type: 'object',
       properties: {
-        calendar_id: {
-          type: 'number',
-          description: 'The calendar ID',
+        calendar_id: { type: 'number', description: 'The calendar ID' },
+        event_uuid: { type: 'string', description: 'The UUID of the event to update (from get_events)' },
+        title: { type: 'string', description: 'New event title' },
+        all_day: { type: 'boolean', description: 'Whether this is an all-day event' },
+        start_at: { type: 'number', description: 'New start time as Unix timestamp in milliseconds' },
+        start_timezone: { type: 'string', description: 'New start timezone (e.g., "Asia/Seoul")' },
+        end_at: { type: 'number', description: 'New end time as Unix timestamp in milliseconds' },
+        end_timezone: { type: 'string', description: 'New end timezone' },
+        label_id: { type: 'number', description: 'New color label ID (1-10)' },
+        category: { type: 'number', description: 'New event category' },
+        note: { type: 'string', description: 'New event notes' },
+        location: { type: 'string', description: 'New event location' },
+        url: { type: 'string', description: 'New related URL' },
+        attendees: {
+          type: 'array',
+          description: 'Replace calendar user attendee IDs',
+          items: { type: 'number' },
         },
-        event_uuid: {
-          type: 'string',
-          description: 'The UUID of the event to update (from get_events)',
+        recurrences: {
+          type: 'array',
+          description: 'Replace recurrence RRULE strings',
+          items: { type: 'string' },
         },
-        title: {
-          type: 'string',
-          description: 'New event title',
+        alerts: {
+          type: 'array',
+          description: 'Replace notification offsets in minutes; use [] to clear',
+          items: { type: 'number' },
         },
-        all_day: {
-          type: 'boolean',
-          description: 'Whether this is an all-day event. ' +
-            'NOTE: For all-day events, TimeTree uses INCLUSIVE end dates (see end_at description).',
-        },
-        start_at: {
-          type: 'number',
-          description: 'New start time as Unix timestamp in milliseconds. ' +
-            'For all-day events, use midnight (00:00:00) of the start date.',
-        },
-        start_timezone: {
-          type: 'string',
-          description: 'New start timezone (e.g., "Asia/Seoul")',
-        },
-        end_at: {
-          type: 'number',
-          description: 'New end time as Unix timestamp in milliseconds. ' +
-            'IMPORTANT: For all-day events, use INCLUSIVE end date. ' +
-            'Example: Feb 15-16 event → end_at should be Feb 16 00:00 (NOT Feb 17).',
-        },
-        end_timezone: {
-          type: 'string',
-          description: 'New end timezone',
-        },
-        label_id: {
-          type: 'number',
-          description: 'New color label ID (1-10)',
-        },
-        category: {
-          type: 'number',
-          description: 'New event category',
-        },
-        note: {
-          type: 'string',
-          description: 'New event notes',
-        },
-        location: {
-          type: 'string',
-          description: 'New event location',
-        },
-        url: {
-          type: 'string',
-          description: 'New related URL',
+        file_uuids: {
+          type: 'array',
+          description: 'Replace attached file UUIDs',
+          items: { type: 'string' },
         },
         checklist: {
           type: 'array',
-          description: 'Replace the event checklist items. Use [] to clear the checklist.',
+          description: 'Replace event checklist items. Use [] to clear checklist.',
           items: {
             type: 'object',
             properties: {
@@ -363,6 +347,11 @@ export function createUpdateEventTool(apiClient: TimeTreeAPIClient) {
             },
             required: ['title'],
           },
+        },
+        virtual_user_attendees: {
+          type: 'array',
+          description: 'Replace virtual member attendees. Use [] to clear.',
+          items: { oneOf: [{ type: 'string' }, { type: 'number' }] },
         },
       },
       required: ['calendar_id', 'event_uuid'],
@@ -390,33 +379,13 @@ export function createUpdateEventTool(apiClient: TimeTreeAPIClient) {
             note: input.note,
             location: input.location,
             url: input.url,
-            attachment: input.checklist === undefined
-              ? undefined
-              : input.checklist.length === 0
-                ? null
-                : { checklist: input.checklist },
+            attendees: input.attendees,
+            recurrences: input.recurrences,
+            alerts: input.alerts,
+            file_uuids: input.file_uuids,
+            attachment: buildAttachment(input.checklist, input.virtual_user_attendees),
           }
         );
-
-        // Format event for output
-        const formattedEvent = {
-          uuid: event.uuid,
-          calendar_id: event.calendar_id,
-          title: event.title,
-          start_at: new Date(event.start_at).toISOString(),
-          start_timezone: event.start_timezone || null,
-          end_at: new Date(event.end_at).toISOString(),
-          end_timezone: event.end_timezone || null,
-          all_day: event.all_day,
-          label_id: event.label_id || null,
-          label_color: event.label_id ? getLabelColorName(event.label_id) : null,
-          location: event.location || null,
-          note: event.note || null,
-          url: event.url || null,
-          category: event.category || null,
-          checklist: event.attachment?.checklist || null,
-          updated_at: event.updated_at ? new Date(event.updated_at).toISOString() : null,
-        };
 
         logger.info('Tool: update_event completed', { uuid: event.uuid });
 
@@ -428,7 +397,7 @@ export function createUpdateEventTool(apiClient: TimeTreeAPIClient) {
                 {
                   success: true,
                   message: 'Event updated successfully',
-                  event: formattedEvent,
+                  event: formatEvent(event),
                 },
                 null,
                 2
@@ -438,81 +407,7 @@ export function createUpdateEventTool(apiClient: TimeTreeAPIClient) {
         };
       } catch (error) {
         logger.error('Tool: update_event failed', { error });
-
-        if (error instanceof TimeTreeAPIError && error.statusCode === 404) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: JSON.stringify(
-                  {
-                    error: 'Event not found',
-                    message: 'The specified event UUID does not exist. Please use get_events to find valid event UUIDs.',
-                  },
-                  null,
-                  2
-                ),
-              },
-            ],
-            isError: true,
-          };
-        }
-
-        if (error instanceof TimeTreeAPIError && error.statusCode === 403) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: JSON.stringify(
-                  {
-                    error: 'Authentication failed',
-                    message: 'CSRF token missing or invalid. Please try again.',
-                  },
-                  null,
-                  2
-                ),
-              },
-            ],
-            isError: true,
-          };
-        }
-
-        if ((error as any).name === 'ZodError') {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: JSON.stringify(
-                  {
-                    error: 'Invalid input',
-                    message: 'Please provide valid update data',
-                    details: (error as any).errors,
-                  },
-                  null,
-                  2
-                ),
-              },
-            ],
-            isError: true,
-          };
-        }
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(
-                {
-                  error: 'Failed to update event',
-                  message: (error as Error).message,
-                },
-                null,
-                2
-              ),
-            },
-          ],
-          isError: true,
-        };
+        return commonWriteError(error, 'update event');
       }
     },
   };
@@ -536,14 +431,8 @@ export function createDeleteEventTool(apiClient: TimeTreeAPIClient) {
     inputSchema: {
       type: 'object',
       properties: {
-        calendar_id: {
-          type: 'number',
-          description: 'The calendar ID',
-        },
-        event_uuid: {
-          type: 'string',
-          description: 'The UUID of the event to delete (from get_events)',
-        },
+        calendar_id: { type: 'number', description: 'The calendar ID' },
+        event_uuid: { type: 'string', description: 'The UUID of the event to delete (from get_events)' },
       },
       required: ['calendar_id', 'event_uuid'],
     },
@@ -577,81 +466,7 @@ export function createDeleteEventTool(apiClient: TimeTreeAPIClient) {
         };
       } catch (error) {
         logger.error('Tool: delete_event failed', { error });
-
-        if (error instanceof TimeTreeAPIError && error.statusCode === 404) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: JSON.stringify(
-                  {
-                    error: 'Event not found',
-                    message: 'The specified event UUID does not exist or has already been deleted.',
-                  },
-                  null,
-                  2
-                ),
-              },
-            ],
-            isError: true,
-          };
-        }
-
-        if (error instanceof TimeTreeAPIError && error.statusCode === 403) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: JSON.stringify(
-                  {
-                    error: 'Authentication failed',
-                    message: 'CSRF token missing or invalid. Please try again.',
-                  },
-                  null,
-                  2
-                ),
-              },
-            ],
-            isError: true,
-          };
-        }
-
-        if ((error as any).name === 'ZodError') {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: JSON.stringify(
-                  {
-                    error: 'Invalid input',
-                    message: 'Please provide valid calendar_id and event_uuid',
-                    details: (error as any).errors,
-                  },
-                  null,
-                  2
-                ),
-              },
-            ],
-            isError: true,
-          };
-        }
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(
-                {
-                  error: 'Failed to delete event',
-                  message: (error as Error).message,
-                },
-                null,
-                2
-              ),
-            },
-          ],
-          isError: true,
-        };
+        return commonWriteError(error, 'delete event');
       }
     },
   };

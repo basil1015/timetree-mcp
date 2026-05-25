@@ -7,7 +7,7 @@ Keep your TimeTree MCP server up-to-date with the latest features and fixes.
 ```bash
 cd /path/to/TimeTree-MCP  # or your installation path
 git pull origin main
-npm install
+npm ci
 npm run build
 ```
 
@@ -30,7 +30,7 @@ git pull origin main
 ### Step 3: Reinstall dependencies
 
 ```bash
-npm install
+npm ci
 ```
 
 ### Step 4: Rebuild the project
@@ -66,8 +66,8 @@ Refer to your client's documentation for restarting. Most require closing and re
 ### If `npm run build` fails:
 
 ```bash
-rm -rf node_modules package-lock.json
-npm install
+rm -rf node_modules
+npm ci
 npm run build
 ```
 
