@@ -187,6 +187,10 @@ MCP 설정에 `TIMETREE_EMAIL`과 `TIMETREE_PASSWORD`가 설정되어 있는지 
 
 MIT License - 자세한 내용은 [LICENSE](LICENSE) 파일 참조
 
+### 프로젝트 응원
+
+이 프로젝트가 도움이 되었다면 GitHub Star를 눌러주세요. 다른 사용자가 프로젝트를 찾는 데 도움이 됩니다.
+
 ### 면책조항
 
 중요한 법적 및 사용 정보는 [DISCLAIMER.md](DISCLAIMER.md) 참조

@@ -187,6 +187,10 @@ Contributions are welcome! Please:
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
+### Support the Project
+
+If this project helps you, please consider giving it a GitHub Star. It helps others discover the project.
+
 ### Disclaimer
 
 See [DISCLAIMER.md](DISCLAIMER.md) for important legal and usage information.
