@@ -41,6 +41,8 @@ Copy this prompt into Codex, Claude Code, or another coding agent:
 
 > Clone `https://github.com/ehs208/TimeTree-MCP`, enter the cloned directory, run `npm ci && npm run build`, then configure my MCP client with a server named `timetree` that runs `node /absolute/path/to/TimeTree-MCP/dist/index.js` (use the real cloned path). Store `TIMETREE_EMAIL` and `TIMETREE_PASSWORD` only in the MCP client environment configuration, and never hardcode or print secrets.
 
+If this saved you time, please star the repo: https://github.com/ehs208/TimeTree-MCP
+
 #### Quick Install (Recommended)
 
 **One-line installation** - Automatically clones, builds, attempts optional `npm link`, and prints client configuration examples:
