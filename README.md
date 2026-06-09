@@ -1,6 +1,6 @@
 # TimeTree MCP Server
 
-[English](#english) | [한국어](README.ko.md)
+[English](#english) | [한국어](README.ko.md) | [日本語](README.ja.md)
 
 ## English
 
