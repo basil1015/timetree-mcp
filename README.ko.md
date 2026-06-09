@@ -6,7 +6,7 @@
 
 > ⚠️ **면책조항**: 이것은 **개인 사용 전용** **비공식** TimeTree MCP 서버입니다. TimeTree, Inc.와 제휴 관계가 없으며 언제든 작동이 중단될 수 있습니다. 자세한 내용은 [DISCLAIMER.md](DISCLAIMER.md)를 참조하십시오.
 
-MCP 클라이언트(Claude Desktop, Claude Code, Codex, Antigravity, Cline, Cursor, Windsurf 등)에서 TimeTree 캘린더 데이터를 관리할 수 있도록 하는 비공식 MCP (Model Context Protocol) 서버입니다.
+Claude, Codex, Cursor, Windsurf 같은 MCP 클라이언트에서 TimeTree 캘린더, 일정, 메모, 댓글, 라벨, 멤버 정보를 로컬로 읽고 관리할 수 있게 해주는 비공식 MCP (Model Context Protocol) 서버입니다. 인증 정보는 MCP 클라이언트 설정에만 저장합니다.
 
 > **크레딧**: 이 프로젝트는 [@eoleedi](https://github.com/eoleedi)의 [TimeTree-Exporter](https://github.com/eoleedi/TimeTree-Exporter)에서 영감을 받았으며 API 분석 결과를 활용했습니다.
 
