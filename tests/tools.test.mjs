@@ -31,16 +31,12 @@ function parseToolText(result) {
   return JSON.parse(result.content[0].text);
 }
 
-test('registerTools exposes baseline plus Wave 1 tools', () => {
+test('registerTools exposes read-only tools (write tools disabled)', () => {
   const names = registerTools({}).map((tool) => tool.name).sort();
 
+  // Read-only build: write tools (create/update/delete/add) are commented out
+  // in src/tools/index.ts. Only listing/getting tools are registered.
   assert.deepEqual(names, [
-    'add_event_comment',
-    'create_event',
-    'create_memo',
-    'delete_event',
-    'delete_event_comment',
-    'delete_memo',
     'get_calendar_labels',
     'get_calendar_members',
     'get_calendar_virtual_members',
@@ -49,10 +45,6 @@ test('registerTools exposes baseline plus Wave 1 tools', () => {
     'list_calendars',
     'list_event_comments',
     'list_memos',
-    'update_calendar_labels',
-    'update_event',
-    'update_event_comment',
-    'update_memo',
   ].sort());
 });
 
