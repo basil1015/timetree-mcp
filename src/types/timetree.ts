@@ -35,7 +35,7 @@ export type EventAttachmentInput = z.infer<typeof EventAttachmentInputSchema>;
 export const CalendarUserSchema = z.object({
   id: z.number(),
   user_id: z.number(),
-  name: z.string(),
+  name: z.string().optional().nullable(), // upstream may return null (e.g. deactivated users)
   role: z.number().optional(), // 1 = owner, 0 = member
   deactivated_at: z.number().nullable().optional(),
   birth_day: z.number().optional().nullable(),

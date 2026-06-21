@@ -166,3 +166,27 @@ test('event comment methods use activity endpoints and filter comment activities
   assert.ok(calls.some((call) => call.url === 'https://timetreeapp.com/api/v1/calendar/123/event/evt/activities'));
   assert.ok(calls.some((call) => call.url === 'https://timetreeapp.com/api/v1/calendar/123/event/evt/activity/comment'));
 });
+
+test('getCalendars tolerates calendar_users with null name (deactivated users)', async () => {
+  const client = makeClient({
+    get: async () => ({
+      calendars: [
+        {
+          id: 1,
+          name: 'Active calendar',
+          calendar_users: [
+            { id: 1, user_id: 1, name: 'Alice', role: 1 },
+            // deactivated member: upstream returns null name
+            { id: 2, user_id: 2, name: null, deactivated_at: 1700000000000 },
+          ],
+        },
+      ],
+    }),
+  });
+
+  const calendars = await client.getCalendars();
+
+  assert.equal(calendars.length, 1);
+  assert.equal(calendars[0].name, 'Active calendar');
+  assert.equal(calendars[0].calendar_users[1].name, null);
+});
