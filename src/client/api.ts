@@ -133,13 +133,17 @@ export class TimeTreeAPIClient {
   private async syncEvents(
     calendarId: string,
     since: number = 0,
-    accumulated: Event[] = []
+    accumulated: Event[] = [],
+    startAt?: number,
+    endAt?: number,
   ): Promise<Event[]> {
-    const url = `${TIMETREE_CONFIG.BASE_URL}${TIMETREE_CONFIG.ENDPOINTS.EVENTS_SYNC(
+    let url = `${TIMETREE_CONFIG.BASE_URL}${TIMETREE_CONFIG.ENDPOINTS.EVENTS_SYNC(
       calendarId
     )}?since=${since}`;
+    if (startAt !== undefined) url += `&start_at=${startAt}`;
+    if (endAt !== undefined) url += `&end_at=${endAt}`;
 
-    logger.debug('Syncing events', { calendarId, since, accumulated: accumulated.length });
+    logger.debug('Syncing events', { calendarId, since, startAt, endAt, accumulated: accumulated.length });
 
     try {
       const response = await this.rateLimiter.executeWithRetry(async () => {
@@ -156,7 +160,7 @@ export class TimeTreeAPIClient {
           nextSince: validated.since,
           fetchedSoFar: accumulated.length,
         });
-        return this.syncEvents(calendarId, validated.since, accumulated);
+        return this.syncEvents(calendarId, validated.since, accumulated, startAt, endAt);
       }
 
       logger.debug('Event sync complete', {
@@ -179,13 +183,15 @@ export class TimeTreeAPIClient {
   /** Get all events from a calendar (handles pagination automatically). */
   async getEventsByCalendar(
     calendarId: string,
-    since: number = 0
+    since: number = 0,
+    startAt?: number,
+    endAt?: number,
   ): Promise<Event[]> {
     await this.ensureAuthenticated();
 
-    logger.info('Fetching events for calendar', { calendarId, since });
+    logger.info('Fetching events for calendar', { calendarId, since, startAt, endAt });
 
-    const events = await this.syncEvents(calendarId, since);
+    const events = await this.syncEvents(calendarId, since, [], startAt, endAt);
 
     logger.info('Events fetched successfully', {
       calendarId,
