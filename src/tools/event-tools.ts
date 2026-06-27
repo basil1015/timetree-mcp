@@ -17,6 +17,12 @@ export const GetEventsInputSchema = z.object({
     .describe(
       'Optional Unix timestamp in milliseconds. Only return events starting after this time.'
     ),
+  end_before: z
+    .number()
+    .optional()
+    .describe(
+      'Optional Unix timestamp in milliseconds. Only return events starting before this time.'
+    ),
   limit: z
     .number()
     .optional()
@@ -38,7 +44,8 @@ export function createGetEventsTool(apiClient: TimeTreeAPIClient) {
   return {
     name: 'get_events',
     description:
-      'Get all events from a specific TimeTree calendar. Automatically handles pagination to fetch all events. ' +
+      'Get events from a specific TimeTree calendar. Automatically handles pagination. ' +
+      'Use start_after and end_before to filter by date range (both are optional). ' +
       'Returns event details including title, start/end times, location, notes, label color, and more. ' +
       'Label colors (label_id 1-10): 1=Emerald green, 2=Modern cyan, 3=Deep sky blue, 4=Pastel brown, ' +
       '5=Midnight black, 6=Apple red, 7=French rose, 8=Coral pink, 9=Bright orange, 10=Soft violet.',
@@ -53,7 +60,13 @@ export function createGetEventsTool(apiClient: TimeTreeAPIClient) {
           type: 'number',
           description:
             'Optional Unix timestamp in milliseconds. Only return events starting after this time. ' +
-            'If user provides a date like "2026-02-01", convert it to Unix timestamp (e.g., 1769904000000).',
+            'If user provides a date like "2026-02-01", convert it to Unix timestamp (e.g., 1738368000000).',
+        },
+        end_before: {
+          type: 'number',
+          description:
+            'Optional Unix timestamp in milliseconds. Only return events starting before this time. ' +
+            'If user provides a date like "2026-12-31", convert it to Unix timestamp (e.g., 1767139200000).',
         },
         limit: {
           type: 'number',
@@ -65,16 +78,26 @@ export function createGetEventsTool(apiClient: TimeTreeAPIClient) {
     handler: async (args: unknown) => {
       try {
         const input = GetEventsInputSchema.parse(args);
-        const { calendar_id, start_after, limit } = input;
+        const { calendar_id, start_after, end_before, limit } = input;
 
-        logger.info('Tool: get_events called', { calendar_id, start_after, limit });
+        logger.info('Tool: get_events called', { calendar_id, start_after, end_before, limit });
 
-        const events = await apiClient.getEventsByCalendar(calendar_id, 0);
+        // Pass date range to the API — the server may use start_at/end_at to narrow
+        // the time window it returns. Client-side filters below act as a guaranteed fallback.
+        const events = await apiClient.getEventsByCalendar(
+          calendar_id,
+          0,
+          start_after,
+          end_before,
+        );
 
-        // Filter by start_after if provided
+        // Client-side date filters (always applied regardless of server-side support)
         let filteredEvents = events;
         if (start_after) {
-          filteredEvents = events.filter((event) => event.start_at > start_after);
+          filteredEvents = filteredEvents.filter((event) => event.start_at > start_after);
+        }
+        if (end_before) {
+          filteredEvents = filteredEvents.filter((event) => event.start_at < end_before);
         }
 
         // Limit results if provided
