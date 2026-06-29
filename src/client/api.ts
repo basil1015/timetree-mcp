@@ -202,6 +202,56 @@ export class TimeTreeAPIClient {
   }
 
   /**
+   * Get all events whose start time falls in [fromMs, toMs) across an arbitrary
+   * date range, including ranges older than the sync endpoint's ~1-year window.
+   *
+   * The TimeTree sync endpoint ignores start_at/end_at and only returns the most
+   * recent ~600 events for since=0. However, passing a past timestamp as the
+   * `since` cursor returns a window of events around that anchor. Sweeping the
+   * `since` cursor across the range and de-duplicating by uuid reconstructs the
+   * full history. A ~2-month (default 60-day) anchor step keeps the per-anchor
+   * windows overlapping so no months are skipped.
+   */
+  async getEventsByDateRange(
+    calendarId: string,
+    fromMs: number,
+    toMs: number,
+    stepDays: number = 60,
+  ): Promise<Event[]> {
+    if (!(fromMs < toMs)) return [];
+    await this.ensureAuthenticated();
+
+    const step = stepDays * 24 * 60 * 60 * 1000;
+    const MAX_ANCHORS = 80; // safety cap (~13 years at 60-day steps)
+    const anchors: number[] = [0]; // 0 = newest window
+    for (let t = toMs; t >= fromMs - step && anchors.length < MAX_ANCHORS; t -= step) {
+      anchors.push(t);
+    }
+
+    logger.info('Fetching events by date range', { calendarId, fromMs, toMs, anchors: anchors.length });
+
+    const seen = new Map<string, Event>();
+    for (const anchor of anchors) {
+      // anchor is passed as the `since` cursor (NOT start_at, which the server ignores).
+      const batch = await this.getEventsByCalendar(calendarId, anchor);
+      for (const event of batch) seen.set(event.uuid, event);
+    }
+
+    const events = [...seen.values()].filter(
+      (event) => event.start_at >= fromMs && event.start_at < toMs,
+    );
+
+    logger.info('Events by date range fetched', {
+      calendarId,
+      anchors: anchors.length,
+      unique: seen.size,
+      inRange: events.length,
+    });
+
+    return events;
+  }
+
+  /**
    * Get events updated after a specific timestamp.
    * This is more efficient than getEventsByCalendar when checking for recent changes.
    */

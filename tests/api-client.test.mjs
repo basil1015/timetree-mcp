@@ -167,6 +167,56 @@ test('event comment methods use activity endpoints and filter comment activities
   assert.ok(calls.some((call) => call.url === 'https://timetreeapp.com/api/v1/calendar/123/event/evt/activity/comment'));
 });
 
+test('getEventsByDateRange sweeps since anchors, dedupes by uuid, and filters to range', async () => {
+  const from = Date.parse('2024-01-01T00:00:00Z');
+  const to = Date.parse('2024-04-01T00:00:00Z');
+  const sinceValues = [];
+  const client = makeClient({
+    get: async (url) => {
+      const m = url.match(/[?&]since=(-?\d+)/);
+      assert.ok(m, `since param missing in ${url}`);
+      const since = Number(m[1]);
+      sinceValues.push(since);
+      return {
+        chunk: false,
+        since,
+        events: [
+          // shared across every anchor -> must be de-duplicated to a single row
+          makeEvent({ uuid: 'dup', start_at: from + 1 }),
+          // unique per anchor, inside the range
+          makeEvent({ uuid: `u${since}`, start_at: from + 2 }),
+          // outside the range -> must be filtered out
+          makeEvent({ uuid: `o${since}`, start_at: to + 1000 }),
+        ],
+      };
+    },
+  });
+
+  const events = await client.getEventsByDateRange('cal-1', from, to, 30);
+  const uuids = events.map((e) => e.uuid).sort();
+
+  // every anchor passed as the `since` cursor, and includes the newest window (0)
+  assert.ok(sinceValues.includes(0));
+  assert.ok(sinceValues.length >= 3);
+  // dup collapsed to one
+  assert.equal(uuids.filter((u) => u === 'dup').length, 1);
+  // no out-of-range event survived
+  assert.ok(!uuids.some((u) => u.startsWith('o')));
+  // unique-per-anchor in-range events all kept
+  assert.equal(uuids.filter((u) => u.startsWith('u')).length, sinceValues.length);
+  // every returned event is within [from, to)
+  assert.ok(events.every((e) => e.start_at >= from && e.start_at < to));
+});
+
+test('getEventsByDateRange returns [] when range is empty/inverted', async () => {
+  const client = makeClient({
+    get: async () => {
+      throw new Error('no HTTP call expected for inverted range');
+    },
+  });
+  assert.deepEqual(await client.getEventsByDateRange('cal-1', 5000, 1000), []);
+});
+
 test('getCalendars tolerates calendar_users with null name (deactivated users)', async () => {
   const client = makeClient({
     get: async () => ({

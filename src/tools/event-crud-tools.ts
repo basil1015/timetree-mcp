@@ -47,6 +47,7 @@ function formatEvent(event: Event) {
     note: event.note || null,
     url: event.url || null,
     category: event.category || null,
+    author_id: event.author_id ?? null,
     attendees: event.attendees || [],
     alerts: event.alerts || [],
     recurrences: event.recurrences || [],

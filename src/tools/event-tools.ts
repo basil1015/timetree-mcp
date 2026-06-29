@@ -46,6 +46,8 @@ export function createGetEventsTool(apiClient: TimeTreeAPIClient) {
     description:
       'Get events from a specific TimeTree calendar. Automatically handles pagination. ' +
       'Use start_after and end_before to filter by date range (both are optional). ' +
+      'When both bounds are given, ranges longer than ~1 year are fetched automatically ' +
+      'via a multi-anchor sweep, so historical events (e.g. back to 2022) are returned. ' +
       'Returns event details including title, start/end times, location, notes, label color, and more. ' +
       'Label colors (label_id 1-10): 1=Emerald green, 2=Modern cyan, 3=Deep sky blue, 4=Pastel brown, ' +
       '5=Midnight black, 6=Apple red, 7=French rose, 8=Coral pink, 9=Bright orange, 10=Soft violet.',
@@ -82,14 +84,13 @@ export function createGetEventsTool(apiClient: TimeTreeAPIClient) {
 
         logger.info('Tool: get_events called', { calendar_id, start_after, end_before, limit });
 
-        // Pass date range to the API — the server may use start_at/end_at to narrow
-        // the time window it returns. Client-side filters below act as a guaranteed fallback.
-        const events = await apiClient.getEventsByCalendar(
-          calendar_id,
-          0,
-          start_after,
-          end_before,
-        );
+        // When both bounds are given, sweep the `since` cursor across the range so
+        // windows older than the sync endpoint's ~1-year limit are also covered.
+        // Otherwise fall back to a single fetch of the most recent window.
+        const events =
+          start_after !== undefined && end_before !== undefined
+            ? await apiClient.getEventsByDateRange(calendar_id, start_after, end_before)
+            : await apiClient.getEventsByCalendar(calendar_id, 0, start_after, end_before);
 
         // Client-side date filters (always applied regardless of server-side support)
         let filteredEvents = events;
@@ -125,6 +126,7 @@ export function createGetEventsTool(apiClient: TimeTreeAPIClient) {
           type: event.type || null,
           created_at: event.created_at ? new Date(event.created_at).toISOString() : null,
           updated_at: event.updated_at ? new Date(event.updated_at).toISOString() : null,
+          author_id: event.author_id ?? null,
           attendees: event.attendees || [],
           alerts: event.alerts || [],
           recurrences: event.recurrences || [],
@@ -282,6 +284,7 @@ export function createGetUpdatedEventsTool(apiClient: TimeTreeAPIClient) {
           type: event.type || null,
           created_at: event.created_at ? new Date(event.created_at).toISOString() : null,
           updated_at: event.updated_at ? new Date(event.updated_at).toISOString() : null,
+          author_id: event.author_id ?? null,
           attendees: event.attendees || [],
           alerts: event.alerts || [],
           recurrences: event.recurrences || [],
