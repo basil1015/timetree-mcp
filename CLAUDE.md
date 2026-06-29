@@ -50,6 +50,25 @@ Prefer small changes that follow these boundaries instead of adding new layers o
 - The upstream API may return mixed types for the same field. Zod schemas should use flexible unions where observed and `.passthrough()` for unknown fields.
 - Label IDs `1` through `10` map to the color metadata in `src/types/label-colors.ts`.
 
+### Event sync time window limitation
+
+The `/events/sync` endpoint returns approximately **1 year of events per call** regardless of the `start_at`/`end_at` query parameters passed. Those parameters do not extend the window server-side.
+
+**Workaround — multi-anchor sweep (verified):**
+To query a date range longer than ~1 year (e.g. 2022–2026), divide the range into 6-month anchors, call `getEventsByCalendar` once per anchor with `startAt` set to each anchor timestamp, then merge all results and deduplicate by `uuid`. A 4.5-year range requires ~9 calls.
+
+```
+anchor_0 = rangeStart
+anchor_1 = rangeStart + 6 months
+...
+anchor_N = rangeEnd
+
+events = flatten(calls per anchor)
+deduplicated = unique by uuid
+```
+
+This pattern is not yet implemented in `src/client/api.ts`. When adding it, place it as a new `getEventsByDateRange(calendarId, fromMs, toMs)` method that wraps `getEventsByCalendar` in the sweep loop.
+
 ## Security and Privacy Rules
 
 - Never commit real `TIMETREE_EMAIL`, `TIMETREE_PASSWORD`, cookies, CSRF tokens, session IDs, request captures, or personal calendar content.
