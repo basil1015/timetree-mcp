@@ -52,22 +52,21 @@ Prefer small changes that follow these boundaries instead of adding new layers o
 
 ### Event sync time window limitation
 
-The `/events/sync` endpoint returns approximately **1 year of events per call** regardless of the `start_at`/`end_at` query parameters passed. Those parameters do not extend the window server-side.
+The `/events/sync` endpoint returns only the most recent ~600 events for `since=0`, and **ignores the `start_at`/`end_at` query parameters** (they do not select an older window server-side). So a single call cannot reach events older than ~1 year.
 
-**Workaround — multi-anchor sweep (verified):**
-To query a date range longer than ~1 year (e.g. 2022–2026), divide the range into 6-month anchors, call `getEventsByCalendar` once per anchor with `startAt` set to each anchor timestamp, then merge all results and deduplicate by `uuid`. A 4.5-year range requires ~9 calls.
+The working lever is the **`since` cursor**, not `start_at`: passing a *past timestamp* as `since` returns a window of events *around that anchor* (~300 events spanning a few months). Sweeping `since` across the range and de-duplicating by `uuid` reconstructs the full history (data exists back to ~2020-11).
+
+**Implemented — multi-anchor sweep via `since`:**
+`TimeTreeAPIClient.getEventsByDateRange(calendarId, fromMs, toMs, stepDays = 60)` in `src/client/api.ts` does this: it builds anchors `[0, toMs, toMs-step, …]` and calls `getEventsByCalendar(calendarId, anchor)` for each — the anchor is the **2nd positional arg (`since`)**, NOT `startAt`. Results are merged by `uuid` and filtered to `[fromMs, toMs)`.
 
 ```
-anchor_0 = rangeStart
-anchor_1 = rangeStart + 6 months
-...
-anchor_N = rangeEnd
-
-events = flatten(calls per anchor)
-deduplicated = unique by uuid
+anchors   = [0, toMs, toMs - step, …, down to >= fromMs - step]   // step default ≈ 60 days
+batch_i   = getEventsByCalendar(calendarId, anchor_i)             // anchor_i passed as `since`
+events    = unique-by-uuid( flatten(batch_i) ) filtered to [fromMs, toMs)
 ```
 
-This pattern is not yet implemented in `src/client/api.ts`. When adding it, place it as a new `getEventsByDateRange(calendarId, fromMs, toMs)` method that wraps `getEventsByCalendar` in the sweep loop.
+- Use a **~2-month (60-day) step**, not 6 months: 6-month anchors leave gaps (windows don't overlap), silently dropping events. 60-day steps keep windows overlapping so no month is skipped.
+- `get_events` calls this automatically when **both** `start_after` and `end_before` are provided.
 
 ## Security and Privacy Rules
 
